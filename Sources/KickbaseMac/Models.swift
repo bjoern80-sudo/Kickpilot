@@ -53,12 +53,17 @@ struct Player: Identifiable, Hashable, Sendable {
     let offerCount: Int
     let sellerUserId: String?
     let onMarket: Bool
+    /// My own open bid on this market player (`uop`), if any.
+    let myOfferPrice: Double?
+    /// Squad only: market value gain since purchase (`mvgl`).
+    let gainSincePurchase: Double?
 
     init(json p: JSONObject, fetchedAt: Date = Date()) {
-        id = J.str(p["i"]) ?? UUID().uuidString
+        // Other managers' squads (/managers/{uid}/squad) use `pi`/`pn` instead of `i`/`n`.
+        id = J.str(p["i"]) ?? J.str(p["pi"]) ?? UUID().uuidString
         firstName = (J.str(p["fn"]) ?? "").trimmingCharacters(in: .whitespaces)
         // Player details (/players/{id}) use `ln` and `tp` instead of `n` and `p`.
-        lastName = (J.str(p["n"]) ?? J.str(p["ln"]) ?? "").trimmingCharacters(in: .whitespaces)
+        lastName = (J.str(p["n"]) ?? J.str(p["ln"]) ?? J.str(p["pn"]) ?? "").trimmingCharacters(in: .whitespaces)
         teamId = J.str(p["tid"]) ?? ""
         position = J.int(p["pos"]) ?? 0
         status = J.int(p["st"]) ?? 0
@@ -76,13 +81,17 @@ struct Player: Identifiable, Hashable, Sendable {
             expiresAt = nil
         }
         offerCount = J.int(p["ofc"]) ?? 0
-        let seller = J.str(p["uoid"])
+        // Market: the listing manager is in `u.i` (no `u` = Kickbase listing).
+        // `uoid`/`uop` on a market item are the user id/price of MY bid, not the seller.
+        let seller = J.str(J.obj(p["u"])?["i"])
         if let seller, !seller.isEmpty, seller != "0" {
             sellerUserId = seller
         } else {
             sellerUserId = nil
         }
         onMarket = J.bool(p["iotm"])
+        myOfferPrice = J.dbl(p["uop"]).flatMap { $0 > 0 ? $0 : nil }
+        gainSincePurchase = J.dbl(p["mvgl"])
     }
 
     var fullName: String {

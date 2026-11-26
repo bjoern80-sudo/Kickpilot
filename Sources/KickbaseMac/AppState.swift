@@ -38,6 +38,20 @@ final class AppState: ObservableObject {
     private var playerInfoFailed: Set<String> = []
     private static let transferPageSize = 25
 
+    // Transfer automation (proposals only – execution needs confirmation in the UI)
+    @Published var autoPlan: AutoPlan?
+    @Published var bidderProfiles: [BidderProfile] = []
+    @Published var autoLoading = false
+    @Published var autoStatus = ""
+    private var mvHistory: [String: [MVPoint]] = [:]
+    /// Budget negative and Friday 19:00 deadline close.
+    @Published var deadlineAlert = false
+    @Published var autoRefreshEnabled = false {
+        didSet { if autoRefreshEnabled != oldValue { restartAutoLoop() } }
+    }
+    private var autoLoop: Task<Void, Never>?
+    private var deadlineWatch: Task<Void, Never>?
+
     private var api: KickbaseAPI?
     private let emailKey = "kickbaseEmail"
     private let leagueKey = "selectedLeague"
@@ -76,6 +90,7 @@ final class AppState: ObservableObject {
             isLoggedIn = true
             isLoading = false
             await refreshAll()
+            startDeadlineWatch()
         } catch {
             isLoading = false
             errorMessage = error.localizedDescription
@@ -83,6 +98,9 @@ final class AppState: ObservableObject {
     }
 
     func logout() {
+        autoRefreshEnabled = false
+        deadlineWatch?.cancel()
+        deadlineAlert = false
         let email = savedEmail
         if !email.isEmpty { Keychain.delete(account: email) }
         isLoggedIn = false
@@ -173,6 +191,9 @@ final class AppState: ObservableObject {
         transfersHaveMore = false
         playerInfo = [:]
         playerInfoFailed = []
+        autoPlan = nil
+        bidderProfiles = []
+        mvHistory = [:]
     }
 
     /// Loads the newest `pages` pages (25 entries each) of every manager's transfers.
@@ -299,6 +320,140 @@ final class AppState: ObservableObject {
                 marketValue: { self.currentMarketValue($0) }
             )
         }
+    }
+
+    // MARK: - Transfer automation
+
+    /// Market value histories (365 days), max. 4 parallel requests, cached per session.
+    private func loadHistories(_ ids: [String]) async {
+        guard let api, let league = currentLeague else { return }
+        let missing = Array(Set(ids)).filter { mvHistory[$0] == nil }
+        var index = 0
+        while index < missing.count {
+            let batch = missing[index..<min(index + 4, missing.count)]
+            index += 4
+            autoStatus = "Marktwertverläufe \(min(index, missing.count))/\(missing.count) …"
+            await withTaskGroup(of: (String, [MVPoint]).self) { group in
+                for id in batch {
+                    group.addTask {
+                        let h = (try? await api.marketValueHistory(league: league.id, playerId: id)) ?? []
+                        return (id, h.sorted { $0.date < $1.date })
+                    }
+                }
+                for await (id, h) in group { mvHistory[id] = h }
+            }
+        }
+    }
+
+    /// Players on the market that I already bid on (`uop` in the market list).
+    private var myOpenBidIds: Set<String> {
+        Set(market.filter { $0.myOfferPrice != nil }.map(\.id))
+    }
+
+    /// Computes bidder profiles and the current buy/sale plan. Read-only.
+    func buildAutoPlan() async {
+        guard !autoLoading else { return }
+        autoLoading = true
+        defer { autoLoading = false; autoStatus = "" }
+
+        autoStatus = "Lade Markt und Kader …"
+        await refreshMarketAndBudget()
+        if let api, let league = currentLeague, let s = try? await api.squad(league: league.id) { squad = s }
+        if transfersLoadedAt == nil {
+            autoStatus = "Lade Transfers …"
+            await loadTransfers(pages: 4)
+        }
+        let boughtIds = transfers.filter { $0.buyerId != nil }.map(\.playerId)
+        await loadHistories(boughtIds + market.map(\.id) + squad.map(\.id))
+
+        let openBids = myOpenBidIds
+
+        bidderProfiles = managers.map { BidderProfile(manager: $0, transfers: transfers, history: mvHistory) }
+        autoPlan = AutoPlanner.plan(
+            budget: budget,
+            squad: squad,
+            market: market,
+            myUserId: myUserId,
+            transfers: transfers,
+            profiles: bidderProfiles,
+            history: mvHistory,
+            openBidPlayerIds: openBids
+        )
+    }
+
+    /// REAL transactions: places the given bids one after another. Returns a log.
+    func executeBuys(_ buys: [BuyProposal]) async -> [String] {
+        var log: [String] = []
+        for b in buys {
+            if let err = await placeOffer(b.player, price: Int(b.bid.rounded())) {
+                log.append("✗ \(b.player.fullName): \(err)")
+            } else {
+                log.append("✓ Gebot \(Fmt.eur(b.bid)) für \(b.player.fullName)")
+            }
+        }
+        return log
+    }
+
+    /// REAL transactions: lists each player and accepts Kickbase's instant offer.
+    func executeSales(_ sales: [SaleProposal]) async -> [String] {
+        guard let api, let league = currentLeague else { return ["Nicht angemeldet."] }
+        var log: [String] = []
+        for s in sales {
+            do {
+                if !s.player.onMarket {
+                    try await api.listForSale(
+                        league: league.id, playerId: s.player.id, price: Int(s.player.marketValue.rounded())
+                    )
+                }
+                try await api.sellToKickbase(league: league.id, playerId: s.player.id)
+                log.append("✓ \(s.player.fullName) an Kickbase verkauft")
+            } catch {
+                log.append("✗ \(s.player.fullName): \(error.localizedDescription)")
+            }
+        }
+        do {
+            async let b = api.budget(league: league.id)
+            async let q = api.squad(league: league.id)
+            budget = try await b
+            squad = try await q
+        } catch {
+            log.append("Budget/Kader konnten nicht neu geladen werden: \(error.localizedDescription)")
+        }
+        return log
+    }
+
+    /// Recomputes the plan every 15 minutes while enabled. Never executes anything.
+    private func restartAutoLoop() {
+        autoLoop?.cancel()
+        guard autoRefreshEnabled else { return }
+        autoLoop = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 15 * 60 * 1_000_000_000)
+                guard !Task.isCancelled, let self, self.isLoggedIn else { continue }
+                await self.buildAutoPlan()
+                self.checkDeadline()
+            }
+        }
+    }
+
+    /// Checks every 5 minutes whether the budget must be balanced soon.
+    func startDeadlineWatch() {
+        deadlineWatch?.cancel()
+        deadlineWatch = Task { [weak self] in
+            while !Task.isCancelled {
+                self?.checkDeadline()
+                try? await Task.sleep(nanoseconds: 5 * 60 * 1_000_000_000)
+            }
+        }
+    }
+
+    private func checkDeadline() {
+        let hours = AutoRules.nextDeadline().timeIntervalSinceNow / 3600
+        let alert = isLoggedIn && budget < 0 && hours <= AutoRules.deadlineWarningHours
+        if alert && !deadlineAlert {
+            NSApp.requestUserAttention(.criticalRequest)
+        }
+        deadlineAlert = alert
     }
 
     // MARK: - Transactions (REAL)

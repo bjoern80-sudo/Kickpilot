@@ -202,6 +202,16 @@ actor KickbaseAPI {
         _ = try await request("DELETE", "/v4/leagues/\(league)/market/\(playerId)/offers/\(offerId)")
     }
 
+    /// Lists one of my players on the transfer market (POST /market/ {pi, prc}).
+    func listForSale(league: String, playerId: String, price: Int) async throws {
+        _ = try await request("POST", "/v4/leagues/\(league)/market/", body: ["pi": playerId, "prc": price])
+    }
+
+    /// Accepts Kickbase's instant offer for a listed player – immediate sale.
+    func sellToKickbase(league: String, playerId: String) async throws {
+        _ = try await request("POST", "/v4/leagues/\(league)/market/\(playerId)/sell", body: JSONObject())
+    }
+
     // MARK: - Helpers
 
     private static func snippet(_ data: Data) -> String {

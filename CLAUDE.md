@@ -31,11 +31,32 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
 - Manager-Transfers: `/v4/leagues/{lid}/managers/{uid}/transfer?start=0` → `it[]` mit
   `dt, pi, pn, tid, trp, tty` (1 Kauf, 2 Verkauf), 25 pro Seite, `start` += 25.
   Grundlage des Transfers-Bereichs (`Transfer.merge` verbindet Kauf+Verkauf zu M2M).
+- Fremder Kader `/managers/{uid}/squad`: Spieler-ID `pi`, Name `pn` (statt `i`/`n`),
+  `prc` = Kaufpreis, `mvgl` = MW-Gewinn seit Kauf.
 - Spielerdetails `/v4/leagues/{lid}/players/{pid}`: Nachname `ln` (statt `n`),
   Punkte `tp` (statt `p`), dazu `mv`, `tfhmvt`, `pos`, `st`, `ap`, `oui` (Besitzer).
 - Antwortformate sind nicht offiziell dokumentiert: bei neuen Endpunkten erst eine
   echte Antwort ansehen (z. B. per kleinem Debug-Aufruf oder MCP-Tool), dann parsen.
   Unbekannte Felder tolerant behandeln (Optionals/Defaults), nie crashen.
+
+- Schreibende Endpunkte (aus kickbase-mcp, NICHT selbst getestet): Gebot POST
+  `/market/{pid}/offers` `{price}`; Listen POST `/market/` `{pi, prc}`; Sofortverkauf an
+  Kickbase POST `/market/{pid}/sell` `{}` (Spieler muss gelistet sein); Annehmen DELETE
+  `/market/{pid}/offers/{oid}/accept`. Fremde Gebote sind nicht sichtbar, nur `ofc` (Anzahl).
+
+## Ligaregeln & Transfer-Automatik (`AutoTransfer.swift`, `AutoTransferView.swift`)
+- Max. 18 Spieler im Kader, max. 3 Spieler pro Verein (`AutoRules`).
+- Immer mindestens 1 Torhüter, 3 Abwehrspieler und 1 Stürmer im Kader (`AutoRules.minPerPosition`);
+  Verkaufsvorschläge dürfen das nie unterschreiten.
+- Budget muss jeden Freitag 19:00 Uhr (Europe/Berlin) ≥ 0 sein.
+  Käufe, die ab Freitag 20:00 Uhr zustande kommen, zählen erst für die Folgewoche.
+- Alle Gebote zusammen: Budget darf höchstens auf −30 % des Teamwerts fallen (Wert vom
+  Nutzer „glaube ich“ – `AutoRules.maxDebtShareOfTeamValue`).
+- Automatik = Vorschläge + Sammelbestätigung; nie ohne Bestätigungsdialog ausführen.
+- Gebote: Marktspieler mit größtem MW-Zuwachs (3 Tage); Gebot = MW × (1 + 75-%-Perzentil
+  des Aufpreises des stärksten Konkurrenten + 1 Pp.), nur wenn der Zuwachs den Aufpreis deckt.
+  Gebotsrahmen = Budget + 97 % des MW aller Spieler außerhalb der Top 11 (Ø-Punkte).
+- Freitags-Ausgleich: schwächste Spieler (Ø-Punkte) mit bestem Wertzuwachs zuerst, Top 11 zuletzt.
 
 ## Regeln
 - Schreibende Aufrufe (Gebote, Verkäufe, Aufstellung) sind ECHTE Transaktionen:

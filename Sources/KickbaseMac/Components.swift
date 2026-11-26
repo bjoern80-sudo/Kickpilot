@@ -59,6 +59,15 @@ enum Fmt {
         return (signed && v > 0 ? "+" : "") + s + " %"
     }
 
+    /// "Fr 28.11. 19:00 Uhr" in German time.
+    static func deadline(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "de_DE")
+        f.timeZone = TimeZone(identifier: "Europe/Berlin")
+        f.dateFormat = "EE dd.MM. HH:mm"
+        return f.string(from: d) + " Uhr"
+    }
+
     static func remaining(_ date: Date?) -> String {
         guard let date else { return "–" }
         let s = Int(date.timeIntervalSinceNow)

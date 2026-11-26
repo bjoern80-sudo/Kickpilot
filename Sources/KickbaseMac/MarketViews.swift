@@ -129,6 +129,12 @@ struct BidView: View {
                     Text("Gebote bisher").foregroundColor(.secondary)
                     Text("\(player.offerCount)")
                 }
+                if let mine = player.myOfferPrice {
+                    GridRow {
+                        Text("Dein Gebot").foregroundColor(.secondary)
+                        Text(Fmt.eur(mine)).monospacedDigit().fontWeight(.semibold)
+                    }
+                }
                 GridRow {
                     Text("Dein Budget").foregroundColor(.secondary)
                     Text(Fmt.eur(state.budget)).monospacedDigit()

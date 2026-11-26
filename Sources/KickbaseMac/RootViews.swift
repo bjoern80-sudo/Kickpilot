@@ -70,6 +70,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case market = "Transfermarkt"
     case league = "Liga"
     case transfers = "Transfers"
+    case auto = "Automatik"
     case analysis = "Kader-Analyse"
 
     var id: String { rawValue }
@@ -80,6 +81,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .market: return "cart.fill"
         case .league: return "list.number"
         case .transfers: return "arrow.left.arrow.right"
+        case .auto: return "wand.and.stars"
         case .analysis: return "chart.bar.xaxis"
         }
     }
@@ -93,7 +95,9 @@ struct MainView: View {
     var body: some View {
         NavigationSplitView {
             List(SidebarItem.allCases, selection: $selection) { item in
-                Label(item.rawValue, systemImage: item.icon).tag(item)
+                Label(item.rawValue, systemImage: item.icon)
+                    .badge(item == .auto && state.deadlineAlert ? "!" : nil)
+                    .tag(item)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
             .safeAreaInset(edge: .bottom) {
@@ -126,6 +130,8 @@ struct MainView: View {
                 }
             case .transfers:
                 TransfersView()
+            case .auto:
+                AutoTransferView()
             case .analysis:
                 AnalysisView(selectedManagerId: $analysisManagerId)
             }
