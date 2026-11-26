@@ -18,7 +18,7 @@ struct KickbaseMacApp: App {
     @StateObject private var state = AppState()
 
     var body: some Scene {
-        WindowGroup("Kickbase") {
+        WindowGroup("Kickpilot") {
             ContentView()
                 .environmentObject(state)
                 .frame(minWidth: 1100, minHeight: 680)

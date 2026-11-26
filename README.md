@@ -1,6 +1,6 @@
-# Kickbase für macOS
+# Kickpilot – Kickbase-Begleiter für macOS
 
-Kleine native SwiftUI-App für Kickbase. Die API-Logik stammt aus
+Kleine native SwiftUI-App für das Fantasy-Spiel Kickbase. Die API-Logik stammt aus
 [behretv/kickbase-mcp](https://github.com/behretv/kickbase-mcp), geprüfter Stand: Commit `13832cb`.
 
 ## Funktionen
@@ -20,9 +20,9 @@ Kleine native SwiftUI-App für Kickbase. Die API-Logik stammt aus
 cd ~/Claude/KickbaseMac
 chmod +x build.sh
 ./build.sh
-open Kickbase.app
+open Kickpilot.app
 ```
-Danach kannst du `Kickbase.app` in den Ordner „Programme“ ziehen.
+Danach kannst du `Kickpilot.app` in den Ordner „Programme“ ziehen.
 
 ## Sicherheit
 - Die App verbindet sich nur mit `api.kickbase.com`.

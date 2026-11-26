@@ -26,7 +26,7 @@ struct LoginView: View {
             Image(systemName: "soccerball")
                 .font(.system(size: 48))
                 .foregroundColor(.accentColor)
-            Text("Kickbase").font(.largeTitle.bold())
+            Text("Kickpilot").font(.largeTitle.bold())
 
             Form {
                 TextField("E-Mail", text: $email)
@@ -136,7 +136,7 @@ struct MainView: View {
                 AnalysisView(selectedManagerId: $analysisManagerId)
             }
         }
-        .navigationTitle(state.currentLeague?.name ?? "Kickbase")
+        .navigationTitle(state.currentLeague?.name ?? "Kickpilot")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if state.leagues.count > 1 {

@@ -1,12 +1,12 @@
-# Kickbase für macOS – Projektnotizen für Claude
+# Kickpilot (Kickbase-Begleiter für macOS) – Projektnotizen für Claude
 
 Native SwiftUI-App (macOS 13+, Swift Package, keine Fremdabhängigkeiten) für das
 Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
 (geprüfter Stand: Commit 13832cb).
 
 ## Bauen & Starten
-- Bauen: `swift build` (schnell, zum Prüfen) bzw. `./build.sh` (Release + Kickbase.app)
-- Starten: `open Kickbase.app`
+- Bauen: `swift build` (schnell, zum Prüfen) bzw. `./build.sh` (Release + Kickpilot.app)
+- Starten: `open Kickpilot.app`
 - Nach jeder Änderung bauen und Fehler beheben, bevor du fertig meldest.
 
 ## Aufbau (Sources/KickbaseMac)

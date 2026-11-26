@@ -2,7 +2,7 @@
 .build/
 
 # Von build.sh erzeugte App
-Kickbase.app/
+Kickpilot.app/
 
 # macOS
 .DS_Store
