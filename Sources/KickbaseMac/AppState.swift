@@ -394,6 +394,23 @@ final class AppState: ObservableObject {
         return log
     }
 
+    /// REAL transaction: withdraws my bid on a market player.
+    /// Kickbase exposes no offer id; the market list only carries my user id (`uoid`) in
+    /// the offer, so the user id is used as offer id (confirmed working, see CLAUDE.md).
+    func withdrawMyBid(_ player: Player) async -> String {
+        guard let api, let league = currentLeague, !myUserId.isEmpty else { return "Nicht angemeldet." }
+        do {
+            try await api.withdrawOffer(league: league.id, playerId: player.id, offerId: myUserId)
+            await refreshMarketAndBudget()
+            if market.first(where: { $0.id == player.id })?.myOfferPrice != nil {
+                return "⚠︎ Kickbase hat geantwortet, dein Gebot auf \(player.fullName) steht aber noch auf dem Markt."
+            }
+            return "✓ Gebot auf \(player.fullName) zurückgezogen"
+        } catch {
+            return "✗ Zurückziehen bei \(player.fullName) fehlgeschlagen: \(error.localizedDescription)"
+        }
+    }
+
     /// REAL transactions: lists each player and accepts Kickbase's instant offer.
     func executeSales(_ sales: [SaleProposal]) async -> [String] {
         guard let api, let league = currentLeague else { return ["Nicht angemeldet."] }

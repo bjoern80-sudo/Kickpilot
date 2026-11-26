@@ -11,6 +11,7 @@ struct AutoTransferView: View {
     @State private var executing = false
     @State private var log: [String] = []
     @State private var detailPlayer: Player? = nil
+    @State private var withdrawPlayer: Player? = nil
 
     private var plan: AutoPlan? { state.autoPlan }
 
@@ -56,6 +57,18 @@ struct AutoTransferView: View {
         } message: {
             Text(chosenBuys.map { "\($0.player.fullName): \(Fmt.eur($0.bid))" }.joined(separator: "\n")
                  + "\n\nDas sind echte Transaktionen in deiner Kickbase-Liga.")
+        }
+        .confirmationDialog(
+            "Gebot über \(Fmt.eur(withdrawPlayer?.myOfferPrice ?? 0)) auf \(withdrawPlayer?.fullName ?? "") zurückziehen?",
+            isPresented: Binding(get: { withdrawPlayer != nil }, set: { if !$0 { withdrawPlayer = nil } }),
+            presenting: withdrawPlayer
+        ) { p in
+            Button("Gebot zurückziehen", role: .destructive) {
+                run { [await state.withdrawMyBid(p)] }
+            }
+            Button("Abbrechen", role: .cancel) {}
+        } message: { _ in
+            Text("Das ist eine echte Aktion in deiner Kickbase-Liga.")
         }
         .confirmationDialog(confirmSalesTitle, isPresented: $confirmSales) {
             Button("Verbindlich verkaufen", role: .destructive) {
@@ -122,12 +135,13 @@ struct AutoTransferView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("Gebotsvorschläge").font(.headline)
-                Text("Spieler mit dem stärksten Marktwertzuwachs (\(Int(AutoRules.momentumDays)) Tage), Gebot knapp über dem erwarteten Höchstgebot der Konkurrenz")
+                Text("stabil steigend oder Trendumkehr nach Boden, noch unter dem letzten Hochpunkt, Gewinn ≥ \(Fmt.eur(AutoRules.minProfit)) bzw. \(Int(AutoRules.minProfitPct)) % · Gebot knapp über \(plan.competitorName) (\(Fmt.pct(plan.competitorPct, signed: true)))")
                     .font(.caption).foregroundColor(.secondary)
                 Spacer()
                 Button("Ausgewählte Gebote abgeben …") { confirmBuys = true }
                     .disabled(chosenBuys.isEmpty || executing)
             }
+            BacktestBox(result: plan.backtest)
             if plan.buys.isEmpty {
                 Text("Aktuell kein Spieler, bei dem sich ein Gebot lohnt.").foregroundColor(.secondary)
             } else {
@@ -136,16 +150,35 @@ struct AutoTransferView: View {
                         Toggle("", isOn: binding(b.id, in: $selectedBuys)).labelsHidden()
                     }
                     .width(24)
-                    TableColumn("Spieler") { b in PlayerNameCell(player: b.player) }
-                    TableColumn("Verein") { b in Text(state.teamName(b.player.teamId)) }
+                    TableColumn("Spieler") { b in
+                        HStack(spacing: 4) {
+                            PlayerNameCell(player: b.player)
+                            Text(b.trend.pattern.rawValue).font(.caption2)
+                                .padding(.horizontal, 4)
+                                .background((b.trend.pattern == .reversal ? Color.purple : Color.green).opacity(0.15),
+                                            in: RoundedRectangle(cornerRadius: 4))
+                                .help(b.trend.pattern == .reversal
+                                      ? "Boden bei \(b.trend.trough.map(Fmt.eur) ?? "–") nach \(b.trend.dropBeforeTroughPct.map { Fmt.pct($0) } ?? "–") Rückgang"
+                                      : "\(b.trend.risingDays) von 5 Tagen gestiegen")
+                        }
+                    }
                     TableColumn("Marktwert") { b in Text(Fmt.eur(b.player.marketValue)).monospacedDigit() }
                     TableColumn("Zuwachs \(Int(AutoRules.momentumDays)) T") { b in
                         Text(Fmt.pct(b.momentumPct, signed: true)).monospacedDigit().foregroundColor(.green)
                     }
                     TableColumn("Gebot") { b in Text(Fmt.eur(b.bid)).monospacedDigit().fontWeight(.semibold) }
                     TableColumn("über MW") { b in Text(Fmt.pct(b.bidOverMVPct, signed: true)).monospacedDigit() }
-                    TableColumn("Stärkster Konkurrent") { b in
-                        Text("\(b.competitorName) (\(Fmt.pct(b.competitorPct, signed: true)))")
+                    TableColumn("Letzter Hochpunkt") { b in
+                        HStack(spacing: 4) {
+                            Text(b.trend.peak.map(Fmt.eur) ?? "–").monospacedDigit()
+                            if let h = b.trend.headroomPct {
+                                Text(Fmt.pct(h, signed: true)).font(.caption).foregroundColor(.secondary)
+                            }
+                        }
+                        .help(b.trend.peakDate.map { "Hochpunkt vom \($0.formatted(date: .numeric, time: .omitted))" } ?? "")
+                    }
+                    TableColumn("Erw. Verkauf (\(Int(AutoRules.holdDays)) T)") { b in
+                        Text(Fmt.eur(b.trend.expectedSale)).monospacedDigit()
                     }
                     TableColumn("Endet") { b in
                         HStack(spacing: 4) {
@@ -219,7 +252,7 @@ struct AutoTransferView: View {
                           systemImage: "exclamationmark.triangle.fill")
                         .foregroundColor(.red)
                 }
-                Text("Budget danach ca. \(Fmt.eur(plan.budgetAfterSales))\(plan.openBids > 0 ? ", falls deine offenen Gebote (\(Fmt.eur(plan.openBids))) gewinnen" : "") (Kickbase-Angebot mit \(Int((AutoRules.kickbaseSaleFactor * 100).rounded())) % vom Marktwert angesetzt)")
+                Text("Budget danach ca. \(Fmt.eur(plan.budgetAfterSales))\(plan.openBids > 0 ? ", falls deine offenen Gebote (\(Fmt.eur(plan.openBids))) gewinnen" : "") (Verkauf an Kickbase zum vollen Marktwert)")
                     .font(.caption).foregroundColor(.secondary)
             }
         }
@@ -266,8 +299,13 @@ struct AutoTransferView: View {
                 Text("Du hast aktuell keine offenen Gebote.").foregroundColor(.secondary)
             } else {
                 Table(bids) {
+                    TableColumn("") { p in
+                        Button("Zurückziehen …") { withdrawPlayer = p }
+                            .controlSize(.small)
+                            .disabled(executing)
+                    }
+                    .width(110)
                     TableColumn("Spieler") { p in PlayerNameCell(player: p) }
-                    TableColumn("Verein") { p in Text(state.teamName(p.teamId)) }
                     TableColumn("Marktwert") { p in Text(Fmt.eur(p.marketValue)).monospacedDigit() }
                     TableColumn("Angebotspreis") { p in Text(Fmt.eur(p.effectivePrice)).monospacedDigit() }
                     TableColumn("Dein Gebot") { p in
@@ -283,7 +321,7 @@ struct AutoTransferView: View {
                         if mine >= rec {
                             Label("reicht vermutlich", systemImage: "checkmark.circle").foregroundColor(.green)
                         } else {
-                            Text("eher zu niedrig (empf. \(Fmt.eur(rec)))").foregroundColor(.orange)
+                            Text("zu niedrig, empf. \(Fmt.mio(rec))").foregroundColor(.orange).help("Empfohlenes Gebot: \(Fmt.eur(rec))")
                         }
                     }
                     TableColumn("Endet") { p in
@@ -344,6 +382,46 @@ struct AutoTransferView: View {
             log = await action()
             executing = false
             await state.buildAutoPlan()
+        }
+    }
+}
+
+/// How the buy rule performed on past market values.
+struct BacktestBox: View {
+    let result: BacktestResult
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "clock.arrow.circlepath").foregroundColor(.secondary)
+            if result.all.signals == 0 {
+                Text("Backtest: In den letzten \(AutoRules.backtestDays) Tagen hätte die Regel kein Gebot ausgelöst.")
+                    .font(.callout).foregroundColor(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Backtest der letzten \(AutoRules.backtestDays) Tage: \(result.all.signals) Gebote nach dieser Regel, Verkauf nach \(Int(AutoRules.holdDays)) Tagen")
+                        .font(.callout.weight(.semibold))
+                    line("Stabiler Anstieg", result.steady)
+                    line("Trendumkehr", result.reversal)
+                    Text("Annahme: jedes Gebot gewinnt zum heute üblichen Aufpreis; Verkauf zum vollen Marktwert.")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+extension BacktestBox {
+    @ViewBuilder
+    fileprivate func line(_ title: String, _ s: BacktestStats) -> some View {
+        if s.signals > 0 {
+            Text("\(title): \(s.signals) × · mit Gewinn \(Fmt.pct(s.hitRate)) · Ø \(Fmt.pct(s.avgProfitPct, signed: true)) · Ziel erreicht \(Fmt.pct(s.targetRate))")
+                .font(.callout).monospacedDigit()
+                .foregroundColor(s.avgProfitPct > 0 ? .green : .red)
+        } else {
+            Text("\(title): keine Signale").font(.callout).foregroundColor(.secondary)
         }
     }
 }

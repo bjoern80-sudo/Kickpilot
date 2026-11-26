@@ -43,6 +43,10 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   `/market/{pid}/offers` `{price}`; Listen POST `/market/` `{pi, prc}`; Sofortverkauf an
   Kickbase POST `/market/{pid}/sell` `{}` (Spieler muss gelistet sein); Annehmen DELETE
   `/market/{pid}/offers/{oid}/accept`. Fremde Gebote sind nicht sichtbar, nur `ofc` (Anzahl).
+- Eigenes Gebot zurückziehen: DELETE `/market/{pid}/offers/{offerId}`. Kickbase liefert KEINE
+  Gebots-ID (Marktliste `ofs` ohne `i`, GET `/market/{pid}` und `/offers` → 405). Die App nutzt
+  die eigene User-ID als offerId – vom Nutzer am 26.11.2026 erfolgreich getestet (Gebot verschwand
+  danach aus der Marktliste).
 
 ## Ligaregeln & Transfer-Automatik (`AutoTransfer.swift`, `AutoTransferView.swift`)
 - Max. 18 Spieler im Kader, max. 3 Spieler pro Verein (`AutoRules`).
@@ -53,9 +57,14 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
 - Alle Gebote zusammen: Budget darf höchstens auf −30 % des Teamwerts fallen (Wert vom
   Nutzer „glaube ich“ – `AutoRules.maxDebtShareOfTeamValue`).
 - Automatik = Vorschläge + Sammelbestätigung; nie ohne Bestätigungsdialog ausführen.
-- Gebote: Marktspieler mit größtem MW-Zuwachs (3 Tage); Gebot = MW × (1 + 75-%-Perzentil
-  des Aufpreises des stärksten Konkurrenten + 1 Pp.), nur wenn der Zuwachs den Aufpreis deckt.
-  Gebotsrahmen = Budget + 97 % des MW aller Spieler außerhalb der Top 11 (Ø-Punkte).
+- Gebote: Gebot = MW × (1 + 75-%-Perzentil des Aufpreises des stärksten Konkurrenten + 1 Pp.).
+  Nur wenn: fit, stabiler Anstieg (≥ 4 von 5 Tagen gestiegen) ODER Trendumkehr (Boden in den
+  letzten 6 Tagen nach ≥ 5 % Rückgang, seitdem ≥ 2 Tage in Folge gestiegen), MW unter dem letzten Hochpunkt (Maximum vor der
+  aktuellen Steigphase), erwarteter Verkaufswert nach 3 Tagen (Trend fortgeschrieben, gedeckelt
+  am Hochpunkt) − Gebot ≥ max(5 % des Gebots, 100.000 €). Hochpunkt = Maximum der 30 Tage vor der
+  aktuellen Steigphase. Heutiger MW wird nur angehängt, wenn er sich geändert hat (Update ~22 Uhr). Backtest über 120 Tage in der Ansicht.
+  Gebotsrahmen = Budget + 100 % des MW aller Spieler außerhalb der Top 11 (Ø-Punkte).
+- Verkauf an Kickbase bringt immer 100 % des Marktwerts (vom Nutzer bestätigt).
 - Freitags-Ausgleich: schwächste Spieler (Ø-Punkte) mit bestem Wertzuwachs zuerst, Top 11 zuletzt.
 
 ## Regeln
