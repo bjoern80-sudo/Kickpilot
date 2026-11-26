@@ -1,0 +1,8 @@
+# Swift-Build-Ausgabe
+.build/
+
+# Von build.sh erzeugte App
+Kickbase.app/
+
+# macOS
+.DS_Store
