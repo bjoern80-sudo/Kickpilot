@@ -14,7 +14,8 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   Auth: POST /v4/user/login → `tkn` als Cookie `kkstrauth`.
 - `Models.swift` – Player, Manager, League, Offer, … + JSON-Helfer `J`
 - `AppState.swift` – @MainActor ObservableObject, lädt Daten, hält Caches
-- `*View(s).swift` – SwiftUI-Oberfläche (Sidebar: Team, Markt, Liga, Kader-Analyse)
+- `*View(s).swift` – SwiftUI-Oberfläche (Sidebar: Team, Markt, Liga, Transfers, Kader-Analyse)
+- `TransferModels.swift` – Transfer, ManagerTransferStats, TransferPeriod
 - `Keychain.swift` – Passwort im macOS-Schlüsselbund
 
 ## API-Eigenheiten (inoffizielle API!)
@@ -25,7 +26,13 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
 - Marktwertverlauf liefert nur mit Zeitraum 365 Daten: `{dt: Tage seit 1970, mv}`.
 - Activity-Feed `/v4/leagues/{lid}/activitiesFeed?start=&max=`: `t:15` = Transfer
   (`byr`/`slr`, `trp`), `t:3` = Kickbase listet Spieler, `t:32` = Auto-Verkauf MVP.
-- Manager-Transfers: `/v4/leagues/{lid}/managers/{uid}/transfer?start=0`.
+- Activity-Feed t:15: `data.t` 1 = Kauf (`byr`), 2 = Verkauf (`slr`) – `byr`/`slr` sind
+  Anzeigenamen (keine IDs!), `pi` Spieler, `pn` Nachname, `trp` Preis. 100 Einträge ≈ 4 Tage.
+- Manager-Transfers: `/v4/leagues/{lid}/managers/{uid}/transfer?start=0` → `it[]` mit
+  `dt, pi, pn, tid, trp, tty` (1 Kauf, 2 Verkauf), 25 pro Seite, `start` += 25.
+  Grundlage des Transfers-Bereichs (`Transfer.merge` verbindet Kauf+Verkauf zu M2M).
+- Spielerdetails `/v4/leagues/{lid}/players/{pid}`: Nachname `ln` (statt `n`),
+  Punkte `tp` (statt `p`), dazu `mv`, `tfhmvt`, `pos`, `st`, `ap`, `oui` (Besitzer).
 - Antwortformate sind nicht offiziell dokumentiert: bei neuen Endpunkten erst eine
   echte Antwort ansehen (z. B. per kleinem Debug-Aufruf oder MCP-Tool), dann parsen.
   Unbekannte Felder tolerant behandeln (Optionals/Defaults), nie crashen.

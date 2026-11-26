@@ -176,6 +176,22 @@ actor KickbaseAPI {
         }
     }
 
+    /// Detail data of a single player (current market value etc.).
+    func playerDetail(league: String, playerId: String) async throws -> Player {
+        let j = try await getObject("/v4/leagues/\(league)/players/\(playerId)")
+        return Player(json: j)
+    }
+
+    /// One page (25 entries) of a manager's transfers, newest first.
+    /// Entries: {dt, pi, pn, tid, trp, tty} – tty 1 = buy, 2 = sale.
+    func managerTransfers(league: String, userId: String, start: Int) async throws -> [ManagerTransferEntry] {
+        let j = try await getObject(
+            "/v4/leagues/\(league)/managers/\(userId)/transfer",
+            query: ["start": String(start)]
+        )
+        return J.arr(j["it"]).compactMap { ManagerTransferEntry(json: $0, userId: userId) }
+    }
+
     // MARK: - Write (REAL transactions)
 
     func placeOffer(league: String, playerId: String, price: Int) async throws {
@@ -192,7 +208,7 @@ actor KickbaseAPI {
         String(String(data: data, encoding: .utf8)?.prefix(200) ?? "")
     }
 
-    private static func parseDate(_ s: String?) -> Date? {
+    static func parseDate(_ s: String?) -> Date? {
         guard let s else { return nil }
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

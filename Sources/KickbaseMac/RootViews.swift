@@ -69,6 +69,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case team = "Mein Team"
     case market = "Transfermarkt"
     case league = "Liga"
+    case transfers = "Transfers"
     case analysis = "Kader-Analyse"
 
     var id: String { rawValue }
@@ -78,6 +79,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .team: return "person.3.fill"
         case .market: return "cart.fill"
         case .league: return "list.number"
+        case .transfers: return "arrow.left.arrow.right"
         case .analysis: return "chart.bar.xaxis"
         }
     }
@@ -122,6 +124,8 @@ struct MainView: View {
                     analysisManagerId = id
                     selection = .analysis
                 }
+            case .transfers:
+                TransfersView()
             case .analysis:
                 AnalysisView(selectedManagerId: $analysisManagerId)
             }

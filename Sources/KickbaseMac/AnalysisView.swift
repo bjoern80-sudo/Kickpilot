@@ -8,6 +8,11 @@ struct AnalysisView: View {
     @State private var sortOrder = [KeyPathComparator(\Player.marketValue, order: .reverse)]
     @State private var detailPlayer: Player? = nil
 
+    private var transferStats: [String: ManagerTransferStats] {
+        guard state.transfersLoadedAt != nil else { return [:] }
+        return Dictionary(uniqueKeysWithValues: state.transferStats(period: .all).map { ($0.id, $0) })
+    }
+
     private var summaries: [ManagerSummary] {
         state.managers.compactMap { m in
             guard let squad = state.managerSquads[m.id] else { return nil }
@@ -55,6 +60,19 @@ struct AnalysisView: View {
                     TableColumn("Auf Markt") { s in Text("\(s.onMarket)") }
                         .width(65)
                     TableColumn("TW-ABW-MIT-ST") { s in Text(s.positions).monospacedDigit() }
+                    TableColumn("Transfersaldo") { s in
+                        if let t = transferStats[s.id] {
+                            HStack(spacing: 4) {
+                                TrendText(value: t.balance)
+                                if t.isHot {
+                                    Image(systemName: "flame.fill").foregroundColor(.orange)
+                                        .help("In den letzten 24 h besonders aktiv")
+                                }
+                            }
+                        } else {
+                            Text("–").foregroundColor(.secondary)
+                        }
+                    }
                 }
                 .frame(height: min(CGFloat(summaries.count) * 26 + 34, 280))
             }
@@ -71,6 +89,7 @@ struct AnalysisView: View {
 
             if let id = selectedManagerId {
                 if let squad = state.managerSquads[id] {
+                    transferSection(for: id)
                     ManagerInsights(squad: squad)
                     PlayerTable(players: squad, sortOrder: $sortOrder) { detailPlayer = $0 }
                 } else {
@@ -83,6 +102,9 @@ struct AnalysisView: View {
         }
         .padding()
         .task(id: selectedManagerId) {
+            if selectedManagerId != nil, state.transfersLoadedAt == nil {
+                await state.loadTransfers()
+            }
             if let id = selectedManagerId, state.managerSquads[id] == nil {
                 await state.loadManagerSquad(id)
             }
@@ -90,6 +112,27 @@ struct AnalysisView: View {
         .sheet(item: $detailPlayer) { p in
             PlayerDetailView(player: p).environmentObject(state)
         }
+    }
+}
+
+extension AnalysisView {
+    @ViewBuilder
+    fileprivate func transferSection(for id: String) -> some View {
+        if let stats = transferStats[id] {
+            ManagerTransferPanel(stats: stats, periodLabel: transferPeriodLabel)
+                .task(id: id) {
+                    await state.loadPlayerInfo(
+                        for: state.transfers.filter { $0.buyerId == id }.map(\.playerId)
+                    )
+                }
+        } else if state.transfersLoading {
+            ProgressView("Lade Transfers …").controlSize(.small)
+        }
+    }
+
+    private var transferPeriodLabel: String {
+        guard let d = state.transfersOldest else { return "geladener Zeitraum" }
+        return "seit \(d.formatted(.dateTime.day().month().year()))"
     }
 }
 

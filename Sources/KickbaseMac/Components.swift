@@ -34,6 +34,31 @@ enum Fmt {
         twoDigits.string(from: NSNumber(value: v)) ?? String(v)
     }
 
+    private static let dateTime: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "de_DE")
+        f.dateFormat = "dd.MM. HH:mm"
+        return f
+    }()
+
+    private static let oneDigit: NumberFormatter = {
+        let f = NumberFormatter()
+        f.locale = Locale(identifier: "de_DE")
+        f.numberStyle = .decimal
+        f.minimumFractionDigits = 1
+        f.maximumFractionDigits = 1
+        return f
+    }()
+
+    /// "26.11. 17:16"
+    static func shortDateTime(_ d: Date) -> String { dateTime.string(from: d) + " Uhr" }
+
+    /// "112,4 %" or with sign "+12,4 %"
+    static func pct(_ v: Double, signed: Bool = false) -> String {
+        let s = oneDigit.string(from: NSNumber(value: v)) ?? String(format: "%.1f", v)
+        return (signed && v > 0 ? "+" : "") + s + " %"
+    }
+
     static func remaining(_ date: Date?) -> String {
         guard let date else { return "–" }
         let s = Int(date.timeIntervalSinceNow)

@@ -56,14 +56,15 @@ struct Player: Identifiable, Hashable, Sendable {
 
     init(json p: JSONObject, fetchedAt: Date = Date()) {
         id = J.str(p["i"]) ?? UUID().uuidString
-        firstName = J.str(p["fn"]) ?? ""
-        lastName = J.str(p["n"]) ?? ""
+        firstName = (J.str(p["fn"]) ?? "").trimmingCharacters(in: .whitespaces)
+        // Player details (/players/{id}) use `ln` and `tp` instead of `n` and `p`.
+        lastName = (J.str(p["n"]) ?? J.str(p["ln"]) ?? "").trimmingCharacters(in: .whitespaces)
         teamId = J.str(p["tid"]) ?? ""
         position = J.int(p["pos"]) ?? 0
         status = J.int(p["st"]) ?? 0
         marketValue = J.dbl(p["mv"]) ?? 0
         trend24h = J.dbl(p["tfhmvt"]) ?? 0
-        totalPoints = J.dbl(p["p"]) ?? 0
+        totalPoints = J.dbl(p["p"]) ?? J.dbl(p["tp"]) ?? 0
         averagePoints = J.dbl(p["ap"]) ?? 0
         price = J.dbl(p["prc"]) ?? 0
         // exs is either seconds until expiry or an epoch timestamp
