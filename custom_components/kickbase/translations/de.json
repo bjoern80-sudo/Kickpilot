@@ -111,7 +111,30 @@
       },
       "squad_size": {
         "name": "Kader"
+      },
+      "bid_limit": {
+        "name": "Gebotsrahmen bis Freitag"
+      },
+      "buy_proposals": {
+        "name": "Kaufvorschläge"
+      },
+      "sale_proposals": {
+        "name": "Verkaufsvorschläge"
+      },
+      "data_status": {
+        "name": "Datenstand Transfers und Marktwerte"
       }
+    },
+    "binary_sensor": {
+      "balance_needed": {
+        "name": "Ausgleich nötig"
+      }
+    }
+  },
+  "services": {
+    "plan_aktualisieren": {
+      "name": "Plan aktualisieren",
+      "description": "Lädt Transfers und Marktwertverläufe neu und berechnet die Vorschläge. Führt nichts aus."
     }
   }
 }

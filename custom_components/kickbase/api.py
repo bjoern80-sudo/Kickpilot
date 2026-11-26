@@ -12,7 +12,7 @@ from typing import Any
 
 import aiohttp
 
-from .models import League, Manager, Player, num, text
+from .models import League, Manager, ManagerTransferEntry, MVPoint, Player, num, text
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -147,6 +147,27 @@ class KickbaseApi:
         j = await self._get(f"/v4/leagues/{league}/ranking")
         managers = [Manager.from_json(x) for x in _arr(j.get("us"))]
         return sorted(managers, key=lambda m: m.placement)
+
+    async def manager_transfers(
+        self, league: str, user_id: str, start: int
+    ) -> list[ManagerTransferEntry]:
+        """One page (25 entries) of a manager's transfers, newest first."""
+        j = await self._get(
+            f"/v4/leagues/{league}/managers/{user_id}/transfer", {"start": str(start)}
+        )
+        entries = (ManagerTransferEntry.from_json(x, user_id) for x in _arr(j.get("it")))
+        return [e for e in entries if e is not None]
+
+    async def market_value_history(self, league: str, player_id: str) -> list[MVPoint]:
+        """Only timeframe 365 returns data. Entries: {dt: days since epoch, mv}."""
+        j = await self._get(f"/v4/leagues/{league}/players/{player_id}/marketvalue/365")
+        points = []
+        for e in _arr(j.get("it")):
+            dt, mv = num(e.get("dt")), num(e.get("mv"))
+            if dt is None or not mv or mv <= 0:
+                continue
+            points.append(MVPoint(datetime.fromtimestamp(dt * 86_400, timezone.utc), mv))
+        return sorted(points, key=lambda p: p.date)
 
 
 def _arr(value: Any) -> list[dict]:

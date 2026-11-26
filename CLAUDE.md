@@ -67,6 +67,15 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
 - Verkauf an Kickbase bringt immer 100 % des Marktwerts (vom Nutzer bestätigt).
 - Freitags-Ausgleich: schwächste Spieler (Ø-Punkte) mit bestem Wertzuwachs zuerst, Top 11 zuletzt.
 
+## Home-Assistant-Integration (`custom_components/kickbase/`)
+- Python-Port für Home Assistant, Plan in `docs/home-assistant-plan.md`.
+- `planner.py` ist eine 1:1-Übertragung von `AutoTransfer.swift`: Regeländerungen immer in BEIDEN
+  Dateien nachziehen.
+- Installieren beim Entwickeln: per SSH (`hassio@homeassistant.local`, mit `sudo tar`) nach
+  `/config/custom_components/kickbase/` kopieren, dann HA neu starten (Module werden nur beim Start geladen).
+- Standard ist halbautomatisch; Vollautomatik nur nach ausdrücklichem Einschalten im Options-Flow
+  (mit Pflicht-Häkchen), Trockenlauf standardmäßig an.
+
 ## Regeln
 - Schreibende Aufrufe (Gebote, Verkäufe, Aufstellung) sind ECHTE Transaktionen:
   in der UI immer mit Bestätigungsdialog; beim Entwickeln niemals selbst auslösen.

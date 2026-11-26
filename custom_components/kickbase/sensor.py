@@ -1,4 +1,4 @@
-"""Kickbase sensors: budget, team value, open bids, deadline, placement, squad."""
+"""Kickbase sensors: key figures, proposals and data status."""
 
 from __future__ import annotations
 
@@ -13,27 +13,18 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import KickbaseConfigEntry
-from .const import CONF_LEAGUE_NAME, DOMAIN, MAX_DEBT_SHARE_OF_TEAM_VALUE
-from .coordinator import KickbaseCoordinator, KickbaseData, next_deadline
+from .coordinator import KickbaseCoordinator, KickbaseData
+from .entity import KickbaseEntity
+from .planner import AutoRules, next_deadline
 
 
-def _open_bids_before_deadline(d: KickbaseData) -> float:
-    deadline = next_deadline()
-    return sum(
-        p.my_offer_price or 0
-        for p in d.market
-        if p.my_offer_price and (p.expires_at is None or p.expires_at <= deadline)
-    )
-
-
-def _all_open_bids(d: KickbaseData) -> float:
-    return sum(p.my_offer_price or 0 for p in d.market)
+def _iso(d: datetime | None) -> str | None:
+    return d.isoformat() if d else None
 
 
 def _squad_attrs(d: KickbaseData) -> dict[str, Any]:
@@ -64,7 +55,7 @@ def _bid_attrs(d: KickbaseData) -> dict[str, Any]:
                 "name": p.full_name,
                 "gebot": round(p.my_offer_price or 0),
                 "marktwert": round(p.market_value),
-                "endet": p.expires_at.isoformat() if p.expires_at else None,
+                "endet": _iso(p.expires_at),
             }
             for p in d.market
             if p.my_offer_price
@@ -72,9 +63,65 @@ def _bid_attrs(d: KickbaseData) -> dict[str, Any]:
     }
 
 
+def _buy_attrs(d: KickbaseData) -> dict[str, Any]:
+    plan = d.plan
+    if plan is None:
+        return {}
+    return {
+        "plan_id": plan.buys_id,
+        "summe": round(plan.total_bids),
+        "erwarteter_gewinn": round(sum(b.expected_gain for b in plan.buys)),
+        "staerkster_konkurrent": plan.competitor_name,
+        "konkurrent_aufpreis_pct": round(plan.competitor_pct, 1),
+        "vorschlaege": [
+            {
+                "id": b.player.id,
+                "name": b.player.full_name,
+                "position": b.player.position_name,
+                "marktwert": round(b.player.market_value),
+                "gebot": round(b.bid),
+                "aufpreis_pct": round(b.bid_over_mv_pct, 1),
+                "erwarteter_gewinn": round(b.expected_gain),
+                "muster": b.trend.pattern,
+                "zuwachs_3t_pct": round(b.momentum_pct, 1),
+                "hochpunkt": round(b.trend.peak) if b.trend.peak else None,
+                "endet": _iso(b.player.expires_at),
+                "nach_frist": b.after_deadline,
+            }
+            for b in plan.buys
+        ],
+        "uebersprungen": len(plan.skipped),
+        "backtest_trefferquote_pct": round(plan.backtest.all.hit_rate),
+        "backtest_signale": plan.backtest.all.signals,
+        "backtest_gewinn_pct": round(plan.backtest.all.avg_profit_pct, 1),
+    }
+
+
+def _sale_attrs(d: KickbaseData) -> dict[str, Any]:
+    plan = d.plan
+    if plan is None:
+        return {}
+    return {
+        "plan_id": plan.sales_id,
+        "budget_nach_geboten": round(plan.committed_budget),
+        "budget_nach_verkaeufen": round(plan.budget_after_sales),
+        "vorschlaege": [
+            {
+                "id": s.player.id,
+                "name": s.player.full_name,
+                "position": s.player.position_name,
+                "erloes": round(s.expected_proceeds),
+                "gewinn_pct": round(s.gain_pct, 1),
+                "basis": s.gain_basis,
+            }
+            for s in plan.sales
+        ],
+    }
+
+
 @dataclass(frozen=True, kw_only=True)
 class KickbaseSensorDescription(SensorEntityDescription):
-    value_fn: Callable[[KickbaseData], float | int | datetime | None]
+    value_fn: Callable[[KickbaseData], float | int | str | datetime | None]
     attrs_fn: Callable[[KickbaseData], dict[str, Any]] | None = None
 
 
@@ -85,6 +132,11 @@ EURO = {
     "suggested_display_precision": 0,
 }
 
+
+def _plan_value(fn: Callable) -> Callable[[KickbaseData], Any]:
+    return lambda d: fn(d.plan) if d.plan else None
+
+
 SENSORS: tuple[KickbaseSensorDescription, ...] = (
     KickbaseSensorDescription(key="budget", translation_key="budget", value_fn=lambda d: d.budget, **EURO),
     KickbaseSensorDescription(
@@ -93,21 +145,47 @@ SENSORS: tuple[KickbaseSensorDescription, ...] = (
     KickbaseSensorDescription(
         key="budget_after_bids",
         translation_key="budget_after_bids",
-        value_fn=lambda d: d.budget - _open_bids_before_deadline(d),
+        value_fn=_plan_value(lambda p: p.committed_budget),
         **EURO,
     ),
     KickbaseSensorDescription(
         key="open_bids",
         translation_key="open_bids",
-        value_fn=_all_open_bids,
+        value_fn=lambda d: sum(p.my_offer_price or 0 for p in d.market),
         attrs_fn=_bid_attrs,
         **EURO,
     ),
     KickbaseSensorDescription(
         key="debt_limit",
         translation_key="debt_limit",
-        value_fn=lambda d: -MAX_DEBT_SHARE_OF_TEAM_VALUE * d.team_value,
+        value_fn=lambda d: -AutoRules.max_debt_share_of_team_value * d.team_value,
         **EURO,
+    ),
+    KickbaseSensorDescription(
+        key="bid_limit",
+        translation_key="bid_limit",
+        value_fn=_plan_value(lambda p: p.bid_limit),
+        attrs_fn=lambda d: {
+            "reserve_ausserhalb_top11": round(d.plan.reserve),
+            "spielraum_bis_minus_grenze": round(d.plan.global_limit),
+        }
+        if d.plan
+        else {},
+        **EURO,
+    ),
+    KickbaseSensorDescription(
+        key="buy_proposals",
+        translation_key="buy_proposals",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_plan_value(lambda p: len(p.buys)),
+        attrs_fn=_buy_attrs,
+    ),
+    KickbaseSensorDescription(
+        key="sale_proposals",
+        translation_key="sale_proposals",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_plan_value(lambda p: len(p.sales)),
+        attrs_fn=_sale_attrs,
     ),
     KickbaseSensorDescription(
         key="next_deadline",
@@ -132,6 +210,30 @@ SENSORS: tuple[KickbaseSensorDescription, ...] = (
         value_fn=lambda d: len(d.squad),
         attrs_fn=_squad_attrs,
     ),
+    KickbaseSensorDescription(
+        key="data_status",
+        translation_key="data_status",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.history_loaded_at,
+        attrs_fn=lambda d: {
+            "transfers": d.transfer_count,
+            "bieterprofile": [
+                {
+                    "name": p.name,
+                    "kaeufe_mit_verlauf": p.samples,
+                    "aufpreis_median_pct": round(p.median_overpay, 1)
+                    if p.median_overpay is not None
+                    else None,
+                    "aufpreis_p75_pct": round(p.typical_high_overpay, 1)
+                    if p.typical_high_overpay is not None
+                    else None,
+                    "kaeufe_pro_woche": round(p.buys_per_week, 1),
+                }
+                for p in d.profiles
+            ],
+        },
+    ),
 )
 
 
@@ -144,8 +246,7 @@ async def async_setup_entry(
     async_add_entities(KickbaseSensor(coordinator, entry, desc) for desc in SENSORS)
 
 
-class KickbaseSensor(CoordinatorEntity[KickbaseCoordinator], SensorEntity):
-    _attr_has_entity_name = True
+class KickbaseSensor(KickbaseEntity, SensorEntity):
     entity_description: KickbaseSensorDescription
 
     def __init__(
@@ -154,15 +255,8 @@ class KickbaseSensor(CoordinatorEntity[KickbaseCoordinator], SensorEntity):
         entry: KickbaseConfigEntry,
         description: KickbaseSensorDescription,
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, entry, description.key)
         self.entity_description = description
-        self._attr_unique_id = f"{entry.unique_id}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=f"Kickbase {entry.data.get(CONF_LEAGUE_NAME, '')}".strip(),
-            manufacturer="Kickbase (inoffizielle API)",
-            entry_type=DeviceEntryType.SERVICE,
-        )
 
     @property
     def native_value(self):
