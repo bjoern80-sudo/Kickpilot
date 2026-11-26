@@ -1,0 +1,67 @@
+{
+  "": {
+    "dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseMac.d",
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseMac.o",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/primary.swiftdeps"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/AnalysisView.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/AnalysisView.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/AnalysisView~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/AnalysisView.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/AnalysisView.dia"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/AppState.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/AppState.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/AppState~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/AppState.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/AppState.dia"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/Components.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Components.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Components~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Components.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Components.dia"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/Keychain.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Keychain.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Keychain~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Keychain.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Keychain.dia"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/KickbaseAPI.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseAPI.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseAPI~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseAPI.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseAPI.dia"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/KickbaseMacApp.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseMacApp.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseMacApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseMacApp.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/KickbaseMacApp.dia"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/MarketViews.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/MarketViews.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/MarketViews~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/MarketViews.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/MarketViews.dia"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/Models.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Models.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Models~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Models.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/Models.dia"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/RootViews.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/RootViews.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/RootViews~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/RootViews.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/RootViews.dia"
+  },
+  "/Users/bjoernbauke/Claude/KickbaseMac/Sources/KickbaseMac/TeamAndLeagueViews.swift": {
+    "object": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/TeamAndLeagueViews.swift.o",
+    "swiftmodule": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/TeamAndLeagueViews~partial.swiftmodule",
+    "swift-dependencies": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/TeamAndLeagueViews.swiftdeps",
+    "diagnostics": "/Users/bjoernbauke/Claude/KickbaseMac/.build/x86_64-apple-macosx/release/KickbaseMac.build/TeamAndLeagueViews.dia"
+  }
+}
