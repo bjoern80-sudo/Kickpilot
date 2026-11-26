@@ -1,0 +1,117 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kickbase verbinden",
+        "description": "Melde dich mit deinem Kickbase-Konto an. Das Passwort wird nur in Home Assistant gespeichert und nur an api.kickbase.com gesendet.",
+        "data": {
+          "email": "E-Mail",
+          "password": "Passwort"
+        }
+      },
+      "league": {
+        "title": "Liga auswählen",
+        "data": {
+          "league_id": "Liga"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Kickbase-Anmeldung erneuern",
+        "description": "Die Anmeldung für {email} ist fehlgeschlagen. Gib das aktuelle Passwort ein.",
+        "data": {
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "E-Mail oder Passwort falsch.",
+      "cannot_connect": "Kickbase ist nicht erreichbar. Versuche es später noch einmal."
+    },
+    "abort": {
+      "already_configured": "Diese Liga ist schon eingerichtet.",
+      "no_leagues": "Dein Konto ist in keiner Liga.",
+      "reauth_successful": "Anmeldung erneuert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Kickbase-Einstellungen",
+        "description": "Rhythmus, Benachrichtigungen und Betriebsart. Änderungen gelten sofort.",
+        "data": {
+          "scan_interval": "Aktualisierungsintervall",
+          "check_times": "Tägliche Prüfzeiten",
+          "friday_times": "Prüfzeiten Freitags-Ausgleich",
+          "warning_hours": "Vorwarnzeit vor der Frist",
+          "mv_fetch_time": "Zeitpunkt Marktwert-Abruf",
+          "notify_targets": "Benachrichtigungsziele",
+          "mode_bids": "Betriebsart Gebote",
+          "mode_sales": "Betriebsart Verkäufe",
+          "full_auto_ack": "Ich weiß, dass im vollautomatischen Modus echte Transaktionen ohne Rückfrage ausgeführt werden",
+          "max_bids_per_run": "Höchstens Gebote pro Prüfung",
+          "max_bid_sum_per_day": "Höchste Gebotssumme pro Tag",
+          "max_sales_per_friday": "Höchstens Verkäufe pro Freitag",
+          "confirm_valid_hours": "Gültigkeit einer Bestätigung",
+          "dry_run": "Trockenlauf"
+        },
+        "data_description": {
+          "scan_interval": "Wie oft Budget, Kader, Markt und Tabelle neu geladen werden.",
+          "check_times": "Zu diesen Uhrzeiten werden Kaufvorschläge berechnet, z. B. 08:00, 22:45.",
+          "friday_times": "Freitags zu diesen Uhrzeiten wird geprüft, ob bis 19:00 verkauft werden muss.",
+          "warning_hours": "So viele Stunden vor Freitag 19:00 wird gewarnt, wenn das Budget negativ ist.",
+          "mv_fetch_time": "Transfers und Marktwertverläufe einmal täglich laden (Kickbase aktualisiert gegen 22:00).",
+          "notify_targets": "An diese notify-Dienste gehen Vorschläge, Warnungen und Ergebnisse.",
+          "mode_bids": "Halbautomatisch: Vorschläge per Nachricht bestätigen. Vollautomatisch: Gebote ohne Rückfrage abgeben.",
+          "mode_sales": "Gilt für den Freitags-Ausgleich.",
+          "full_auto_ack": "Pflicht, sobald eine Betriebsart auf vollautomatisch steht.",
+          "max_bids_per_run": "Gilt nur für die Vollautomatik. Weitere Vorschläge kommen zum Bestätigen.",
+          "max_bid_sum_per_day": "Gilt nur für die Vollautomatik.",
+          "max_sales_per_friday": "Gilt nur für die Vollautomatik.",
+          "confirm_valid_hours": "Danach wird ein Tipp auf „Bestätigen“ abgelehnt.",
+          "dry_run": "Nur protokollieren, nichts ausführen. Erst ausschalten, wenn alles geprüft ist."
+        }
+      }
+    },
+    "error": {
+      "invalid_times": "Uhrzeiten im Format 08:00, 22:45 angeben.",
+      "single_time": "Genau eine Uhrzeit angeben, z. B. 22:30.",
+      "full_auto_ack_required": "Für die Vollautomatik musst du bestätigen, dass echte Transaktionen ohne Rückfrage ausgeführt werden."
+    }
+  },
+  "selector": {
+    "mode": {
+      "options": {
+        "semi": "Halbautomatisch (Vorschläge bestätigen)",
+        "full": "Vollautomatisch (ohne Rückfrage ausführen)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "budget": {
+        "name": "Budget"
+      },
+      "team_value": {
+        "name": "Teamwert"
+      },
+      "budget_after_bids": {
+        "name": "Budget nach Geboten"
+      },
+      "open_bids": {
+        "name": "Offene Gebote"
+      },
+      "debt_limit": {
+        "name": "Minus-Grenze"
+      },
+      "next_deadline": {
+        "name": "Nächste Frist"
+      },
+      "placement": {
+        "name": "Platz"
+      },
+      "squad_size": {
+        "name": "Kader"
+      }
+    }
+  }
+}
