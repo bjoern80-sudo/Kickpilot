@@ -30,8 +30,19 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Lokale Ad-hoc-Signatur (nötig für den Schlüsselbund-Zugriff)
-codesign --force --sign - "$APP"
+# Signatur: bevorzugt mit eigenem Zertifikat „Kickbase Local Signing“
+# (Schlüsselbundverwaltung → Zertifikatsassistent → Zertifikat erstellen,
+# Typ „Codesignatur“). Damit bleibt die App-Identität über Builds hinweg gleich
+# und „Immer erlauben“ beim Schlüsselbund-Zugriff gilt dauerhaft.
+# Ohne Zertifikat: Ad-hoc-Signatur (macOS fragt dann nach jedem Build erneut).
+SIGN_ID="Kickbase Local Signing"
+if security find-certificate -c "$SIGN_ID" >/dev/null 2>&1; then
+    echo "▶︎ Signiere mit „$SIGN_ID“ …"
+    codesign --force --sign "$SIGN_ID" "$APP"
+else
+    echo "⚠︎ Zertifikat „$SIGN_ID“ nicht gefunden – Ad-hoc-Signatur."
+    codesign --force --sign - "$APP"
+fi
 
 echo "✅ Fertig: $(pwd)/$APP"
 echo "   Starten mit: open \"$(pwd)/$APP\""
