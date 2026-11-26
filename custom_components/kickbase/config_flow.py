@@ -169,11 +169,10 @@ class KickbaseConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 def _number(minimum: float, maximum: float, step: float, unit: str | None = None) -> NumberSelector:
-    return NumberSelector(
-        NumberSelectorConfig(
-            min=minimum, max=maximum, step=step, mode=NumberSelectorMode.BOX, unit_of_measurement=unit
-        )
-    )
+    config = NumberSelectorConfig(min=minimum, max=maximum, step=step, mode=NumberSelectorMode.BOX)
+    if unit:  # HA rejects unit_of_measurement=None
+        config["unit_of_measurement"] = unit
+    return NumberSelector(config)
 
 
 class KickbaseOptionsFlow(OptionsFlow):

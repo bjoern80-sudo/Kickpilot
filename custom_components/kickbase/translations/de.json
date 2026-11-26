@@ -84,6 +84,12 @@
         "semi": "Halbautomatisch (Vorschläge bestätigen)",
         "full": "Vollautomatisch (ohne Rückfrage ausführen)"
       }
+    },
+    "art": {
+      "options": {
+        "kaeufe": "Käufe (Gebote)",
+        "verkaeufe": "Verkäufe"
+      }
     }
   },
   "entity": {
@@ -129,12 +135,57 @@
       "balance_needed": {
         "name": "Ausgleich nötig"
       }
+    },
+    "switch": {
+      "automation": {
+        "name": "Automatik aktiv"
+      }
+    },
+    "select": {
+      "mode_bids": {
+        "name": "Betriebsart Gebote",
+        "state": {
+          "semi": "Halbautomatisch",
+          "full": "Vollautomatisch"
+        }
+      },
+      "mode_sales": {
+        "name": "Betriebsart Verkäufe",
+        "state": {
+          "semi": "Halbautomatisch",
+          "full": "Vollautomatisch"
+        }
+      }
     }
   },
   "services": {
     "plan_aktualisieren": {
       "name": "Plan aktualisieren",
       "description": "Lädt Transfers und Marktwertverläufe neu und berechnet die Vorschläge. Führt nichts aus."
+    },
+    "vorschlaege_senden": {
+      "name": "Vorschläge senden",
+      "description": "Schickt die aktuellen Vorschläge mit Bestätigen-Knopf an die Benachrichtigungsziele.",
+      "fields": {
+        "art": {
+          "name": "Art",
+          "description": "Käufe oder Verkäufe"
+        }
+      }
+    },
+    "vorschlaege_ausfuehren": {
+      "name": "Vorschläge ausführen",
+      "description": "Führt einen bestätigten Auftrag oder die aktuellen Vorschläge aus. ECHTE Transaktionen, außer der Trockenlauf ist an.",
+      "fields": {
+        "auftrag": {
+          "name": "Auftrag",
+          "description": "Kennung aus der Benachrichtigung"
+        },
+        "art": {
+          "name": "Art",
+          "description": "Käufe oder Verkäufe"
+        }
+      }
     }
   }
 }

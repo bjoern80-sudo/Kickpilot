@@ -10,6 +10,7 @@ Nothing here executes transactions.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import logging
@@ -102,6 +103,9 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
         self._backtest: BacktestResult | None = None
         self._backtest_key: tuple | None = None
         self._unsub: list[CALLBACK_TYPE] = []
+        # Set by __init__.py: KickbaseAutomation.async_on_schedule
+        self.on_schedule: Callable[[str], Awaitable[None]] | None = None
+        self.automation = None  # KickbaseAutomation, set by __init__.py
 
     # ---- cache ------------------------------------------------------------
 
@@ -169,12 +173,16 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
     async def _handle_check_time(self, now: datetime) -> None:
         await self.async_refresh()
         self.fire_proposals("kaeufe")
+        if self.on_schedule:
+            await self.on_schedule("kaeufe")
 
     async def _handle_friday_time(self, now: datetime) -> None:
         if dt_util.as_local(now).weekday() != AutoRules.deadline_weekday:
             return
         await self.async_refresh()
         self.fire_proposals("verkaeufe")
+        if self.on_schedule:
+            await self.on_schedule("verkaeufe")
 
     @callback
     def fire_proposals(self, kind: str) -> None:

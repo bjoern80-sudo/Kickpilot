@@ -84,6 +84,12 @@
         "semi": "Semi-automatic (confirm proposals)",
         "full": "Fully automatic (execute without asking)"
       }
+    },
+    "art": {
+      "options": {
+        "kaeufe": "Buys (bids)",
+        "verkaeufe": "Sales"
+      }
     }
   },
   "entity": {
@@ -129,12 +135,57 @@
       "balance_needed": {
         "name": "Balance needed"
       }
+    },
+    "switch": {
+      "automation": {
+        "name": "Automation active"
+      }
+    },
+    "select": {
+      "mode_bids": {
+        "name": "Bid mode",
+        "state": {
+          "semi": "Semi-automatic",
+          "full": "Fully automatic"
+        }
+      },
+      "mode_sales": {
+        "name": "Sale mode",
+        "state": {
+          "semi": "Semi-automatic",
+          "full": "Fully automatic"
+        }
+      }
     }
   },
   "services": {
     "plan_aktualisieren": {
       "name": "Refresh plan",
       "description": "Reloads transfers and market value histories and recomputes proposals. Executes nothing."
+    },
+    "vorschlaege_senden": {
+      "name": "Send proposals",
+      "description": "Sends the current proposals with a confirm button to the notification targets.",
+      "fields": {
+        "art": {
+          "name": "Kind",
+          "description": "Buys or sales"
+        }
+      }
+    },
+    "vorschlaege_ausfuehren": {
+      "name": "Execute proposals",
+      "description": "Executes a confirmed order or the current proposals. REAL transactions unless dry run is on.",
+      "fields": {
+        "auftrag": {
+          "name": "Order",
+          "description": "ID from the notification"
+        },
+        "art": {
+          "name": "Kind",
+          "description": "Buys or sales"
+        }
+      }
     }
   }
 }

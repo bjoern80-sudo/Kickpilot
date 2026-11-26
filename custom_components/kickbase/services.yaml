@@ -1,1 +1,28 @@
 plan_aktualisieren:
+
+vorschlaege_senden:
+  fields:
+    art:
+      required: true
+      selector:
+        select:
+          options:
+            - kaeufe
+            - verkaeufe
+          translation_key: art
+
+vorschlaege_ausfuehren:
+  fields:
+    auftrag:
+      required: false
+      example: "a1b2c3d4"
+      selector:
+        text:
+    art:
+      required: false
+      selector:
+        select:
+          options:
+            - kaeufe
+            - verkaeufe
+          translation_key: art

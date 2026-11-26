@@ -169,6 +169,19 @@ class KickbaseApi:
             points.append(MVPoint(datetime.fromtimestamp(dt * 86_400, timezone.utc), mv))
         return sorted(points, key=lambda p: p.date)
 
+    # ---- write: REAL transactions (only called from automation.py) ------------
+
+    async def place_offer(self, league: str, player_id: str, price: int) -> None:
+        await self._request("POST", f"/v4/leagues/{league}/market/{player_id}/offers", body={"price": price})
+
+    async def list_for_sale(self, league: str, player_id: str, price: int) -> None:
+        """Lists one of my players on the transfer market."""
+        await self._request("POST", f"/v4/leagues/{league}/market/", body={"pi": player_id, "prc": price})
+
+    async def sell_to_kickbase(self, league: str, player_id: str) -> None:
+        """Accepts Kickbase's instant offer for a listed player – immediate sale."""
+        await self._request("POST", f"/v4/leagues/{league}/market/{player_id}/sell", body={})
+
 
 def _arr(value: Any) -> list[dict]:
     if not isinstance(value, list):
