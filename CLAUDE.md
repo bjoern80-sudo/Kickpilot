@@ -68,6 +68,8 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   am Hochpunkt) − Gebot ≥ max(5 % des Gebots, 100.000 €). Hochpunkt = Maximum der 30 Tage vor der
   aktuellen Steigphase. Heutiger MW wird nur angehängt, wenn er sich geändert hat (Update ~22 Uhr). Backtest über 120 Tage in der Ansicht.
   Gebotsrahmen = Budget + 100 % des MW aller Spieler außerhalb der Top 11 (Ø-Punkte).
+  Kaufvorschlag erst am Ablauftag des Angebots (`exs`, gleicher Kalendertag Europe/Berlin) – dann ist
+  sicherer, ob der Marktwert wie geschätzt steigt.
 - Verkauf an Kickbase bringt immer 100 % des Marktwerts (vom Nutzer bestätigt).
 - Freitags-Ausgleich: schwächste Spieler (Ø-Punkte) mit bestem Wertzuwachs zuerst, Top 11 zuletzt.
 

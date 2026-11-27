@@ -463,8 +463,13 @@ enum AutoPlanner {
             let afterDeadline = ends >= plan.freeFrom
             let inGap = ends > plan.deadline && ends < plan.freeFrom
 
+            // Only bid on the day the listing ends: by then the trend is more reliable.
+            let endsToday = p.expiresAt.map { AutoRules.berlin.isDate($0, inSameDayAs: now) } ?? false
+
             if openBidPlayerIds.contains(p.id) {
                 plan.skipped.append(.init(player: p, reason: "Du hast schon geboten"))
+            } else if !endsToday {
+                plan.skipped.append(.init(player: p, reason: "Angebot endet nicht heute"))
             } else if squadCount >= AutoRules.maxSquadSize {
                 plan.skipped.append(.init(player: p, reason: "Kader voll (\(AutoRules.maxSquadSize))"))
             } else if perClub[p.teamId, default: 0] >= AutoRules.maxPerClub {

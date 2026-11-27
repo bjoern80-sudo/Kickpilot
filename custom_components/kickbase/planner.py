@@ -504,8 +504,16 @@ def make_plan(
         after_deadline = ends >= plan.free_from
         in_gap = plan.deadline < ends < plan.free_from
 
+        # Only bid on the day the listing ends: by then the trend is more reliable.
+        ends_today = (
+            p.expires_at is not None
+            and p.expires_at.astimezone(BERLIN).date() == now.astimezone(BERLIN).date()
+        )
+
         if p.id in open_bid_ids:
             plan.skipped.append(SkippedCandidate(p, "Du hast schon geboten"))
+        elif not ends_today:
+            plan.skipped.append(SkippedCandidate(p, "Angebot endet nicht heute"))
         elif squad_count >= AutoRules.max_squad_size:
             plan.skipped.append(SkippedCandidate(p, f"Kader voll ({AutoRules.max_squad_size})"))
         elif per_club.get(p.team_id, 0) >= AutoRules.max_per_club:

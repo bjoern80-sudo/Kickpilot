@@ -100,6 +100,7 @@ def _buy_attrs(d: KickbaseData) -> dict[str, Any]:
             for b in plan.buys
         ],
         "uebersprungen": len(plan.skipped),
+        "warten_auf_ablauftag": sum(1 for s in plan.skipped if s.reason == "Angebot endet nicht heute"),
         "backtest_trefferquote_pct": round(plan.backtest.all.hit_rate),
         "backtest_signale": plan.backtest.all.signals,
         "backtest_gewinn_pct": round(plan.backtest.all.avg_profit_pct, 1),

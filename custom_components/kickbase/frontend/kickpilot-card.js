@@ -588,11 +588,13 @@ class KickpilotCard extends HTMLElement {
             <button class="primary" data-act="execute" data-arg="kaeufe" ${this._busy ? "disabled" : ""}><ha-icon icon="mdi:gavel"></ha-icon>${this._busy === "execute" ? "Läuft …" : "Gebote abgeben"}</button>
             <button class="ghost" data-act="send" data-arg="kaeufe" ${this._busy ? "disabled" : ""}><ha-icon icon="mdi:cellphone-message"></ha-icon>Aufs Handy</button>
           </div>`
-      : `<div class="empty">Gerade keine Kaufvorschläge. ${a("uebersprungen") ?? 0} Kandidaten geprüft, keiner erfüllt die Regeln.</div>`;
+      : `<div class="empty">Gerade keine Kaufvorschläge. ${a("uebersprungen") ?? 0} Kandidaten geprüft, keiner erfüllt die Regeln.${
+          a("warten_auf_ablauftag") ? ` ${a("warten_auf_ablauftag")} davon passen, ihr Angebot endet aber erst an einem späteren Tag.` : ""
+        }</div>`;
     return `<div class="card s6">
       <div class="head"><div class="h"><ha-icon icon="mdi:cart-arrow-down"></ha-icon>Kaufvorschläge</div><span class="count">${items.length}</span></div>
       ${body}
-      <div class="foot">Stärkster Konkurrent: ${esc(a("staerkster_konkurrent") ?? "–")} (${pct(a("konkurrent_aufpreis_pct"))}) · Backtest ${a("backtest_trefferquote_pct") ?? "–"} % Treffer bei ${NUM.format(a("backtest_signale") ?? 0)} Signalen</div>
+      <div class="foot">Vorschläge nur für Angebote, die heute enden · Stärkster Konkurrent: ${esc(a("staerkster_konkurrent") ?? "–")} (${pct(a("konkurrent_aufpreis_pct"))}) · Backtest ${a("backtest_trefferquote_pct") ?? "–"} % Treffer bei ${NUM.format(a("backtest_signale") ?? 0)} Signalen</div>
     </div>`;
   }
 

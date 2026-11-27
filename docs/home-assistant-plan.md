@@ -48,7 +48,7 @@ ohne Neustart.
 | Einstellung | Standard | Bedeutung |
 |---|---|---|
 | Aktualisierungsintervall | 15 min (5–120) | Budget, Kader, Markt, Tabelle neu laden |
-| Tägliche Prüfzeiten | 08:00, 22:45 | Vorschläge berechnen und melden, wenn es welche gibt |
+| Tägliche Prüfzeiten | 00:05, 08:00, 22:45 | Vorschläge berechnen und melden, wenn es welche gibt |
 | Prüfzeiten Freitags-Ausgleich | 13:00, 17:00 | Verkaufsvorschläge melden, wenn das Budget nach Geboten < 0 ist |
 | Vorwarnzeit vor der Frist | 6 h | ab dann schaltet `binary_sensor.kickbase_ausgleich_noetig` |
 | Zeitpunkt Marktwert-Abruf | 22:30 | Transfers und Marktwertverläufe neu laden |

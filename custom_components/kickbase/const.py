@@ -9,7 +9,7 @@ CONF_LEAGUE_NAME = "league_name"
 
 # Options (all editable later via the options flow)
 OPT_SCAN_INTERVAL = "scan_interval"  # minutes
-OPT_CHECK_TIMES = "check_times"  # "08:00, 22:45"
+OPT_CHECK_TIMES = "check_times"  # "00:05, 08:00, 22:45"
 OPT_FRIDAY_TIMES = "friday_times"  # "13:00, 17:00"
 OPT_WARNING_HOURS = "warning_hours"
 OPT_MV_FETCH_TIME = "mv_fetch_time"  # "22:30"
@@ -32,7 +32,7 @@ DESIGN_HA = "ha"
 
 DEFAULT_OPTIONS: dict = {
     OPT_SCAN_INTERVAL: 15,
-    OPT_CHECK_TIMES: "08:00, 22:45",
+    OPT_CHECK_TIMES: "00:05, 08:00, 22:45",
     OPT_FRIDAY_TIMES: "13:00, 17:00",
     OPT_WARNING_HOURS: 6,
     OPT_MV_FETCH_TIME: "22:30",
