@@ -73,6 +73,31 @@ const CLUBS = {
   "Darmstadt": ["SVD", quarters("#004E9E", W)],
   "Düsseldorf": ["F95", band(W, "#E2001A", 135)],
 };
+// Erklärungen hinter den Info-Zeichen (Regeln aus AutoTransfer.swift / planner.py).
+const INFO = {
+  bid_limit:
+    "So viel kannst du bis zur Frist (Freitag 19:00 Uhr) insgesamt bieten und dein Budget trotzdem rechtzeitig ins Plus bringen: " +
+    "Budget abzüglich offener Gebote plus der Marktwert aller Spieler außerhalb deiner Top 11 (nach Ø-Punkten). " +
+    "Die kann man jederzeit für 100 % des Marktwerts an Kickbase verkaufen. " +
+    "Käufe, die erst ab Freitag 20:00 Uhr zustande kommen, zählen für die Folgewoche.",
+  debt_limit:
+    "Ligaregel: Mit allen Geboten zusammen darf dein Budget höchstens auf −30 % deines Teamwerts fallen " +
+    "(Teamwert = Summe der Marktwerte deines Kaders). Gebote darüber hinaus schlägt Kickpilot nie vor. " +
+    "Unabhängig davon muss das Budget jeden Freitag um 19:00 Uhr wieder mindestens 0 sein.",
+  mode_bids:
+    "Zu den Prüfzeiten sucht Kickpilot Kaufkandidaten: fit, Angebot endet heute, Marktwert stabil steigend " +
+    "(4 von 5 Tagen) oder Trendumkehr, noch unter dem letzten Hochpunkt und erwarteter Gewinn nach 3 Tagen " +
+    "mindestens 5 % bzw. 100.000 €. Gebot = Marktwert + üblicher Aufpreis des stärksten Konkurrenten + 1 Prozentpunkt.\n\n" +
+    "Halbautomatisch: Vorschläge kommen aufs Handy, geboten wird erst nach deiner Bestätigung.\n" +
+    "Vollautomatisch: Gebote werden ohne Rückfrage abgegeben, begrenzt durch Anzahl und Tagessumme aus den Einstellungen.",
+  mode_sales:
+    "Freitags zu den eingestellten Zeiten prüft Kickpilot, ob dein Budget nach offenen Geboten zur Frist " +
+    "(19:00 Uhr) im Minus wäre. Dann schlägt es Verkäufe an Kickbase (100 % des Marktwerts) vor: zuerst die " +
+    "schwächsten Spieler nach Ø-Punkten mit dem besten Wertzuwachs, die Top 11 zuletzt. Mindestens 1 Torhüter, " +
+    "3 Abwehrspieler und 1 Stürmer bleiben immer im Kader.\n\n" +
+    "Halbautomatisch: Verkauft wird erst nach deiner Bestätigung.\n" +
+    "Vollautomatisch: Verkäufe laufen ohne Rückfrage, höchstens so viele wie in den Einstellungen erlaubt.",
+};
 const POS_ORDER = { TW: 1, ABW: 2, MIT: 3, ST: 4 };
 const POS_COLORS = { TW: "#f59e0b", ABW: "#60a5fa", MIT: "#a78bfa", ST: "#f87171" };
 const NUM = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
@@ -192,6 +217,17 @@ button ha-icon { --mdc-icon-size:18px; }
 .toggle::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff;
   transition:left .15s; box-shadow:0 1px 3px rgba(0,0,0,.3); }
 .toggle.on::after { left:23px; }
+.info { position:relative; display:inline-flex; vertical-align:middle; margin-left:4px; cursor:help; }
+.info > ha-icon { --mdc-icon-size:15px; color:var(--kp-mut); }
+.info:hover > ha-icon, .info.open > ha-icon { color:var(--kp-accent); }
+.tip { display:none; position:absolute; z-index:5; top:calc(100% + 6px); left:-8px; width:min(300px, 80cqi);
+  background:var(--kp-card2); color:var(--kp-text); border:var(--kp-border); border-radius:12px; padding:10px 12px;
+  font-size:12px; font-weight:400; line-height:1.5; white-space:pre-line; text-align:left; cursor:default;
+  box-shadow:0 10px 30px rgba(0,0,0,.35); }
+.root.ha .tip { background:var(--card-background-color, #fff); }
+.info:hover > .tip, .info.open > .tip { display:block; }
+.tip-r .tip { left:auto; right:-8px; }
+@container (min-width: 821px) { .tip-r .tip { left:-8px; right:auto; } }
 .seg-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--kp-line); font-size:13px; }
 .seg { display:inline-flex; background:var(--kp-card2); border-radius:10px; padding:3px; }
 .seg button { background:none; color:var(--kp-mut); padding:6px 10px; border-radius:8px; font-size:12px; }
@@ -242,6 +278,7 @@ class KickpilotCard extends HTMLElement {
     this._busy = null;
     this._confirm = null;
     this._toast = null;
+    this._info = null;
     this._sig = "";
     this.shadowRoot.addEventListener("click", (ev) => this._onClick(ev));
   }
@@ -346,9 +383,17 @@ class KickpilotCard extends HTMLElement {
 
   _onClick(ev) {
     const el = ev.composedPath().find((n) => n.dataset && n.dataset.act);
+    if (this._info && el?.dataset.act !== "info" && !el?.classList?.contains("tip")) {
+      this._info = null;
+      this._render(true);
+    }
     if (!el) return;
     const act = el.dataset.act;
     if (act === "noop") return;
+    if (act === "info") {
+      this._info = this._info === el.dataset.arg ? null : el.dataset.arg;
+      return this._render(true);
+    }
     const arg = el.dataset.arg;
     if (act === "confirm-yes") return this._runConfirmed();
     if (act === "confirm-no") {
@@ -546,18 +591,23 @@ class KickpilotCard extends HTMLElement {
   }
 
   _stats() {
-    const tile = (key, label, value, cls = "") =>
-      `<div class="card s3" data-act="more" data-arg="${key}" style="cursor:pointer"><div class="lbl">${label}</div><div class="mid ${cls}">${value}</div></div>`;
+    const tile = (key, label, value, cls = "", extra = "") =>
+      `<div class="card s3 ${extra}" data-act="more" data-arg="${key}" style="cursor:pointer"><div class="lbl">${label}${INFO[key] ? this._info_icon(key) : ""}</div><div class="mid ${cls}">${value}</div></div>`;
     const open = num(this._st("open_bids"));
     const limit = num(this._st("bid_limit"));
     const debt = num(this._st("debt_limit"));
     const squad = num(this._st("squad_size"));
     return [
       tile("open_bids", "Offene Gebote", mio(open)),
-      tile("bid_limit", "Gebotsrahmen", mio(limit), limit < 0 ? "neg" : ""),
+      tile("bid_limit", "Gebotsrahmen", mio(limit), limit < 0 ? "neg" : "", "tip-r"),
       tile("debt_limit", "Minus-Grenze", mio(debt)),
       tile("squad_size", "Kader", squad == null ? "–" : `${squad} / 18`),
     ].join("");
+  }
+
+  _info_icon(key) {
+    return `<span class="info ${this._info === key ? "open" : ""}" data-act="info" data-arg="${key}" role="button" tabindex="0"
+      aria-label="Erklärung anzeigen"><ha-icon icon="mdi:information-outline"></ha-icon><span class="tip" data-act="noop">${esc(INFO[key])}</span></span>`;
   }
 
   _badge(pos) {
@@ -645,7 +695,7 @@ class KickpilotCard extends HTMLElement {
     const on = this._st("automation")?.state === "on";
     const seg = (key, label) => {
       const cur = this._st(key)?.state;
-      return `<div class="seg-row"><span>${label}</span><div class="seg">
+      return `<div class="seg-row"><span>${label}${this._info_icon(key)}</span><div class="seg">
         <button class="${cur === "semi" ? "sel" : ""}" data-act="mode" data-arg="${key}:semi" ${this._busy ? "disabled" : ""}>Halbautomatisch</button>
         <button class="${cur === "full" ? "sel full" : ""}" data-act="mode" data-arg="${key}:full" ${this._busy ? "disabled" : ""}>Vollautomatisch</button>
       </div></div>`;
