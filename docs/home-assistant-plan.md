@@ -88,7 +88,7 @@ Schutz im Vollautomatik-Modus:
    (Standard 20 Mio. €), höchstens Z Verkäufe pro Freitag (Standard 3). Darüber hinaus wird nicht automatisch
    ausgeführt, sondern wie im halbautomatischen Modus gefragt.
 4. **Ligaregeln bleiben hart:** max. 18 Spieler, max. 3 pro Verein, Mindestbesetzung (1 TW, 3 ABW, 1 ST),
-   Minus-Grenze −30 % des Teamwerts und Budget ≥ 0 am Freitag 19:00 prüft der Planer weiterhin vor jeder Aktion.
+   Minus-Grenze −30 % des Teamwerts und Budget ≥ 0 am Freitag 20:30 prüft der Planer weiterhin vor jeder Aktion.
 5. **Notbremse:** `switch.kickbase_automatik` aus stoppt sofort alles. Nach 2 Fehlern in Folge (z. B. API
    geändert) schaltet sich die Vollautomatik selbst auf Halbautomatisch zurück und meldet das.
 6. **Protokoll:** Jede automatische Aktion steht im Logbuch und kommt als Push-Nachricht.
@@ -114,7 +114,7 @@ Einschalten durch den Nutzer. Diese Regel wird bei der Umsetzung in CLAUDE.md er
 | `sensor.kickbase_teamwert` | Summe der Marktwerte im Kader | – |
 | `sensor.kickbase_budget_nach_geboten` | Budget minus offene Gebote, die vor der Frist enden | – |
 | `sensor.kickbase_gebotsrahmen` | Spielraum bis Freitag | Minus-Grenze (−30 % des Teamwerts), Reserve |
-| `sensor.kickbase_naechste_frist` | Zeitpunkt: Freitag 19:00 | – |
+| `sensor.kickbase_naechste_frist` | Zeitpunkt: Freitag 20:30 | – |
 | `sensor.kickbase_kaufvorschlaege` | Anzahl | Liste: Spieler, Gebot, erwarteter Gewinn, Ende der Auktion, Muster |
 | `sensor.kickbase_verkaufsvorschlaege` | Anzahl | Liste: Spieler, Erlös, Gewinn in % |
 | `sensor.kickbase_plan_id` | Kurzer Hash des aktuellen Plans | Zeitpunkt der Berechnung |

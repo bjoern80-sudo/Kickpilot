@@ -51,7 +51,7 @@ Startelf auf dem Spielfeld und die Ersatzbank.
 |---|---|
 | **Überblick** | Sensoren für Budget, Teamwert, Budget nach offenen Geboten, Minus-Grenze, Gebotsrahmen bis Freitag, Platz in der Liga und Kadergröße. HA speichert den Verlauf, damit siehst du Budget und Teamwert über Wochen. |
 | **Kaufvorschläge** | Zu festen Prüfzeiten sucht Kickpilot Spieler auf dem Transfermarkt, deren Marktwert voraussichtlich steigt, und schlägt ein passendes Gebot vor. |
-| **Freitags-Ausgleich** | Ist dein Budget vor Freitag 19:00 Uhr im Minus, schlägt Kickpilot Verkäufe vor. Schwache Spieler mit gutem Wertzuwachs gehen zuerst, deine Top 11 zuletzt. |
+| **Freitags-Ausgleich** | Ist dein Budget vor Freitag 20:30 Uhr im Minus, schlägt Kickpilot Verkäufe vor. Schwache Spieler mit gutem Wertzuwachs gehen zuerst, deine Top 11 zuletzt. |
 | **Push-Nachrichten** | Vorschläge, Warnungen und Ergebnisse gehen an die Benachrichtigungsziele, die du auswählst, z. B. die Companion-App auf dem iPhone. Bestätigen und Ablehnen geht direkt aus der Nachricht. |
 | **Halb- oder vollautomatisch** | Standard ist halbautomatisch: nichts passiert ohne deine Bestätigung. Die Vollautomatik musst du ausdrücklich einschalten, und sie hat Grenzen pro Prüfung und Tag. |
 | **Trockenlauf** | Zum Ausprobieren: Kickpilot schreibt nur ins Logbuch, was es tun würde, und führt nichts aus. |
@@ -82,7 +82,7 @@ Diese Regeln prüft Kickpilot vor jedem Vorschlag und vor jeder Ausführung:
 | Spieler im Kader | höchstens 18 |
 | Spieler pro Verein | höchstens 3 |
 | Mindestbesetzung | 1 Torhüter, 3 Abwehrspieler, 1 Stürmer |
-| Budget am Freitag 19:00 Uhr | mindestens 0 € |
+| Budget am Freitag 20:30 Uhr | mindestens 0 € (Käufe danach zählen für die Folgewoche) |
 | Alle Gebote zusammen | Budget höchstens bis −30 % des Teamwerts |
 
 > [!NOTE]
@@ -135,9 +135,9 @@ Alles lässt sich später unter **Einstellungen → Geräte & Dienste → Kickba
 |---|---|---|
 | Aktualisierungsintervall | 15 min | Budget, Kader, Markt und Tabelle neu laden (5–120 min) |
 | Tägliche Prüfzeiten | 00:05, 08:00, 22:45 | Kaufvorschläge berechnen und melden |
-| Prüfzeiten Freitags-Ausgleich | 13:00, 17:00 | Prüfen, ob bis Freitag 19:00 Uhr verkauft werden muss |
+| Prüfzeiten Freitags-Ausgleich | 13:00, 17:00 | Prüfen, ob bis Freitag 20:30 Uhr verkauft werden muss |
 | Vorwarnzeit vor der Frist | 6 h | Ab dann warnt Kickpilot bei negativem Budget |
-| Zeitpunkt Marktwert-Abruf | 22:30 | Transfers und Marktwertverläufe laden (Kickbase aktualisiert gegen 22 Uhr) |
+| Zeitpunkt Marktwert-Abruf | 22:30 | Transfers und Marktwertverläufe laden (Kickbase aktualisiert die Marktwerte täglich um 22:00 Uhr) |
 | Benachrichtigungsziele | – | `notify`-Dienste für Vorschläge, Warnungen und Ergebnisse |
 | Betriebsart Gebote / Verkäufe | Halbautomatisch | Vollautomatisch nur mit Pflicht-Häkchen |
 | Höchstens Gebote pro Prüfung | 3 | Nur Vollautomatik, weitere Vorschläge kommen zum Bestätigen |

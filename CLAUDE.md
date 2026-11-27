@@ -56,8 +56,12 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
 - Max. 18 Spieler im Kader, max. 3 Spieler pro Verein (`AutoRules`).
 - Immer mindestens 1 Torhüter, 3 Abwehrspieler und 1 Stürmer im Kader (`AutoRules.minPerPosition`);
   Verkaufsvorschläge dürfen das nie unterschreiten.
-- Budget muss jeden Freitag 19:00 Uhr (Europe/Berlin) ≥ 0 sein.
-  Käufe, die ab Freitag 20:00 Uhr zustande kommen, zählen erst für die Folgewoche.
+- Budget muss jeden Freitag 20:30 Uhr (Europe/Berlin) ≥ 0 sein (vom Nutzer am 27.11.2026 korrigiert).
+  Käufe, die danach zustande kommen, zählen schon für die Folgewoche – ab 20:30 darf sofort wieder
+  geboten und ins Minus gegangen werden (keine Sperrlücke).
+- Kickbase aktualisiert alle Marktwerte täglich um 22:00 Uhr (Europe/Berlin), `AutoRules.marketValueUpdateHour`.
+  Vor 22 Uhr gilt der Wert vom Vorabend: Freitags-Verkäufe bringen bis zur Frist immer denselben Erlös,
+  Marktwertverläufe/Prüfungen nach 22 Uhr sehen den neuen Wert.
 - Alle Gebote zusammen: Budget darf höchstens auf −30 % des Teamwerts fallen (Wert vom
   Nutzer „glaube ich“ – `AutoRules.maxDebtShareOfTeamValue`).
 - Automatik = Vorschläge + Sammelbestätigung; nie ohne Bestätigungsdialog ausführen.
@@ -66,7 +70,7 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   letzten 6 Tagen nach ≥ 5 % Rückgang, seitdem ≥ 2 Tage in Folge gestiegen), MW unter dem letzten Hochpunkt (Maximum vor der
   aktuellen Steigphase), erwarteter Verkaufswert nach 3 Tagen (Trend fortgeschrieben, gedeckelt
   am Hochpunkt) − Gebot ≥ max(5 % des Gebots, 100.000 €). Hochpunkt = Maximum der 30 Tage vor der
-  aktuellen Steigphase. Heutiger MW wird nur angehängt, wenn er sich geändert hat (Update ~22 Uhr). Backtest über 120 Tage in der Ansicht.
+  aktuellen Steigphase. Heutiger MW wird nur angehängt, wenn er sich geändert hat (Update täglich 22:00). Backtest über 120 Tage in der Ansicht.
   Gebotsrahmen = Budget + 100 % des MW aller Spieler außerhalb der Top 11 (Ø-Punkte).
   Kaufvorschlag erst am Ablauftag des Angebots (`exs`, gleicher Kalendertag Europe/Berlin) – dann ist
   sicherer, ob der Marktwert wie geschätzt steigt.

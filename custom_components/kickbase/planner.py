@@ -38,9 +38,13 @@ class AutoRules:
     peak_lookback_days = 30
     rise_tolerance_pct = 0.5
     backtest_days = 120
+    # Budget deadline: every Friday 20:30 (German time). Purchases that complete after it
+    # count for the following week and may push the budget below zero again right away.
     deadline_weekday = 4  # Friday (Python: Monday = 0)
-    deadline_hour = 19
-    free_window_hour = 20
+    deadline_hour = 20
+    deadline_minute = 30
+    # Kickbase updates all market values once a day at 22:00 (German time).
+    market_value_update_hour = 22
     max_debt_share_of_team_value = 0.30
     deadline_warning_hours = 6.0
 
@@ -49,11 +53,11 @@ POSITION_NAMES = {1: "Torhüter", 2: "Abwehrspieler", 3: "Mittelfeldspieler", 4:
 
 
 def next_deadline(now: datetime | None = None) -> datetime:
-    """Next Friday 19:00 Europe/Berlin (today if it is Friday before 19:00)."""
+    """Next Friday 20:30 Europe/Berlin (today if it is Friday before 20:30)."""
     now = (now or datetime.now(timezone.utc)).astimezone(BERLIN)
     days = (AutoRules.deadline_weekday - now.weekday()) % 7
     candidate = (now + timedelta(days=days)).replace(
-        hour=AutoRules.deadline_hour, minute=0, second=0, microsecond=0
+        hour=AutoRules.deadline_hour, minute=AutoRules.deadline_minute, second=0, microsecond=0
     )
     if candidate <= now:
         candidate += timedelta(days=7)
@@ -88,7 +92,11 @@ def round_bid(raw: float) -> float:
 
 
 def history_with_current(h: list[MVPoint], current: float, now: datetime) -> list[MVPoint]:
-    """History with today's market value appended – only if it is a new value."""
+    """History with today's market value appended – only if it is a new value.
+
+    Kickbase updates market values once a day at 22:00; before that the current value
+    equals the last history point and appending it would fake a "flat" day.
+    """
     if current <= 0:
         return h
     if not h:
@@ -385,7 +393,6 @@ class AutoPlan:
     all_open_bids: float = 0.0
     open_bids: float = 0.0
     deadline: datetime = field(default_factory=next_deadline)
-    free_from: datetime = field(default_factory=lambda: next_deadline() + timedelta(hours=1))
     budget_after_sales: float = 0.0
     committed_budget: float = 0.0
     competitor_pct: float = AutoRules.default_overpay_pct
@@ -445,9 +452,6 @@ def make_plan(
     )
     committed = budget - plan.open_bids
     plan.committed_budget = committed
-    plan.free_from = plan.deadline + timedelta(
-        hours=AutoRules.free_window_hour - AutoRules.deadline_hour
-    )
 
     team_value = sum(p.market_value for p in squad)
     plan.debt_limit = team_value * AutoRules.max_debt_share_of_team_value
@@ -501,8 +505,7 @@ def make_plan(
             plan.skipped.append(SkippedCandidate(p, str(result)))
             continue
         ends = p.expires_at or far
-        after_deadline = ends >= plan.free_from
-        in_gap = plan.deadline < ends < plan.free_from
+        after_deadline = ends > plan.deadline
 
         # Only bid on the day the listing ends: by then the trend is more reliable.
         ends_today = (
@@ -520,8 +523,6 @@ def make_plan(
             plan.skipped.append(
                 SkippedCandidate(p, f"Schon {AutoRules.max_per_club} Spieler dieses Vereins")
             )
-        elif in_gap:
-            plan.skipped.append(SkippedCandidate(p, "Endet Freitag zwischen 19 und 20 Uhr"))
         elif bid > global_remaining:
             pct = int(AutoRules.max_debt_share_of_team_value * 100)
             plan.skipped.append(SkippedCandidate(p, f"Über der Minus-Grenze (−{pct} % Teamwert)"))

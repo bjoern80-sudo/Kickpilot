@@ -44,7 +44,7 @@ final class AppState: ObservableObject {
     @Published var autoLoading = false
     @Published var autoStatus = ""
     private var mvHistory: [String: [MVPoint]] = [:]
-    /// Budget negative and Friday 19:00 deadline close.
+    /// Budget negative and Friday 20:30 deadline close.
     @Published var deadlineAlert = false
     @Published var autoRefreshEnabled = false {
         didSet { if autoRefreshEnabled != oldValue { restartAutoLoop() } }

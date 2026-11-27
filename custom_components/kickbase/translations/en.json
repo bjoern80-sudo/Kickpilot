@@ -58,9 +58,9 @@
         "data_description": {
           "scan_interval": "How often budget, squad, market and table are reloaded.",
           "check_times": "Buy proposals are computed at these times, e.g. 08:00, 22:45.",
-          "friday_times": "On Fridays at these times it is checked whether players must be sold by 19:00.",
-          "warning_hours": "Warn this many hours before Friday 19:00 if the budget is negative.",
-          "mv_fetch_time": "Load transfers and market value histories once a day.",
+          "friday_times": "On Fridays at these times it is checked whether players must be sold by 20:30.",
+          "warning_hours": "Warn this many hours before Friday 20:30 if the budget is negative.",
+          "mv_fetch_time": "Load transfers and market value histories once a day (Kickbase updates market values daily at 22:00, so pick a later time).",
           "notify_targets": "Proposals, warnings and results go to these notify services.",
           "mode_bids": "Semi-automatic: confirm proposals. Fully automatic: bid without asking.",
           "mode_sales": "Applies to the Friday balance.",

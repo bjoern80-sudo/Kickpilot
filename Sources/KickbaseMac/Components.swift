@@ -59,7 +59,7 @@ enum Fmt {
         return (signed && v > 0 ? "+" : "") + s + " %"
     }
 
-    /// "Fr 28.11. 19:00 Uhr" in German time.
+    /// "Fr 28.11. 20:30 Uhr" in German time.
     static func deadline(_ d: Date) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "de_DE")

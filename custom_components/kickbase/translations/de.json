@@ -58,9 +58,9 @@
         "data_description": {
           "scan_interval": "Wie oft Budget, Kader, Markt und Tabelle neu geladen werden.",
           "check_times": "Zu diesen Uhrzeiten werden Kaufvorschläge berechnet, z. B. 08:00, 22:45.",
-          "friday_times": "Freitags zu diesen Uhrzeiten wird geprüft, ob bis 19:00 verkauft werden muss.",
-          "warning_hours": "So viele Stunden vor Freitag 19:00 wird gewarnt, wenn das Budget negativ ist.",
-          "mv_fetch_time": "Transfers und Marktwertverläufe einmal täglich laden (Kickbase aktualisiert gegen 22:00).",
+          "friday_times": "Freitags zu diesen Uhrzeiten wird geprüft, ob bis 20:30 verkauft werden muss.",
+          "warning_hours": "So viele Stunden vor Freitag 20:30 wird gewarnt, wenn das Budget negativ ist.",
+          "mv_fetch_time": "Transfers und Marktwertverläufe einmal täglich laden (Kickbase aktualisiert die Marktwerte täglich um 22:00, daher danach).",
           "notify_targets": "An diese notify-Dienste gehen Vorschläge, Warnungen und Ergebnisse.",
           "mode_bids": "Halbautomatisch: Vorschläge per Nachricht bestätigen. Vollautomatisch: Gebote ohne Rückfrage abgeben.",
           "mode_sales": "Gilt für den Freitags-Ausgleich.",

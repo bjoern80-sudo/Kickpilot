@@ -76,25 +76,27 @@ const CLUBS = {
 // Erklärungen hinter den Info-Zeichen (Regeln aus AutoTransfer.swift / planner.py).
 const INFO = {
   bid_limit:
-    "So viel kannst du bis zur Frist (Freitag 19:00 Uhr) insgesamt bieten und dein Budget trotzdem rechtzeitig ins Plus bringen: " +
+    "So viel kannst du bis zur Frist (Freitag 20:30 Uhr) insgesamt bieten und dein Budget trotzdem rechtzeitig ins Plus bringen: " +
     "Budget abzüglich offener Gebote plus der Marktwert aller Spieler außerhalb deiner Top 11 (nach Ø-Punkten). " +
     "Die kann man jederzeit für 100 % des Marktwerts an Kickbase verkaufen. " +
-    "Käufe, die erst ab Freitag 20:00 Uhr zustande kommen, zählen für die Folgewoche.",
+    "Käufe, die erst nach Freitag 20:30 Uhr zustande kommen, zählen für die Folgewoche – danach darfst du sofort wieder ins Minus gehen.",
   debt_limit:
     "Ligaregel: Mit allen Geboten zusammen darf dein Budget höchstens auf −30 % deines Teamwerts fallen " +
     "(Teamwert = Summe der Marktwerte deines Kaders). Gebote darüber hinaus schlägt Kickpilot nie vor. " +
-    "Unabhängig davon muss das Budget jeden Freitag um 19:00 Uhr wieder mindestens 0 sein.",
+    "Unabhängig davon muss das Budget jeden Freitag um 20:30 Uhr wieder mindestens 0 sein.",
   mode_bids:
     "Zu den Prüfzeiten sucht Kickpilot Kaufkandidaten: fit, Angebot endet heute, Marktwert stabil steigend " +
     "(4 von 5 Tagen) oder Trendumkehr, noch unter dem letzten Hochpunkt und erwarteter Gewinn nach 3 Tagen " +
-    "mindestens 5 % bzw. 100.000 €. Gebot = Marktwert + üblicher Aufpreis des stärksten Konkurrenten + 1 Prozentpunkt.\n\n" +
+    "mindestens 5 % bzw. 100.000 €. Kickbase aktualisiert die Marktwerte täglich um 22:00 Uhr – die Prüfung danach " +
+    "sieht schon die neuen Werte. Gebot = Marktwert + üblicher Aufpreis des stärksten Konkurrenten + 1 Prozentpunkt.\n\n" +
     "Halbautomatisch: Vorschläge kommen aufs Handy, geboten wird erst nach deiner Bestätigung.\n" +
     "Vollautomatisch: Gebote werden ohne Rückfrage abgegeben, begrenzt durch Anzahl und Tagessumme aus den Einstellungen.",
   mode_sales:
     "Freitags zu den eingestellten Zeiten prüft Kickpilot, ob dein Budget nach offenen Geboten zur Frist " +
-    "(19:00 Uhr) im Minus wäre. Dann schlägt es Verkäufe an Kickbase (100 % des Marktwerts) vor: zuerst die " +
+    "(20:30 Uhr) im Minus wäre. Dann schlägt es Verkäufe an Kickbase (100 % des Marktwerts) vor: zuerst die " +
     "schwächsten Spieler nach Ø-Punkten mit dem besten Wertzuwachs, die Top 11 zuletzt. Mindestens 1 Torhüter, " +
-    "3 Abwehrspieler und 1 Stürmer bleiben immer im Kader.\n\n" +
+    "3 Abwehrspieler und 1 Stürmer bleiben immer im Kader. Der Marktwert ändert sich erst um 22:00 Uhr, " +
+    "der Erlös ist freitags bis zur Frist also immer gleich.\n\n" +
     "Halbautomatisch: Verkauft wird erst nach deiner Bestätigung.\n" +
     "Vollautomatisch: Verkäufe laufen ohne Rückfrage, höchstens so viele wie in den Einstellungen erlaubt.",
 };

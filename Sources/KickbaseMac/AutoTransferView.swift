@@ -108,7 +108,7 @@ struct AutoTransferView: View {
                 StatCard(title: "Freitags verkaufbar (ohne Top-\(AutoRules.keepCore))",
                          value: Fmt.eur(plan?.reserve ?? 0))
                 StatCard(title: "Offene Gebote", value: Fmt.eur(plan?.openBids ?? 0))
-                StatCard(title: "Rahmen bis Freitag 19 Uhr", value: Fmt.eur(plan?.bidLimit ?? 0))
+                StatCard(title: "Rahmen bis Freitag 20:30 Uhr", value: Fmt.eur(plan?.bidLimit ?? 0))
                 StatCard(title: "Gesamtrahmen (bis −\(Int(AutoRules.maxDebtShareOfTeamValue * 100)) % Teamwert)",
                          value: Fmt.eur(plan?.globalLimit ?? 0))
                 StatCard(title: "Kader", value: "\(state.squad.count) / \(AutoRules.maxSquadSize)",
@@ -187,7 +187,7 @@ struct AutoTransferView: View {
                                 Text("nach Stichtag").font(.caption2)
                                     .padding(.horizontal, 4)
                                     .background(Color.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
-                                    .help("Endet ab Freitag 20 Uhr – zählt erst für die nächste Woche")
+                                    .help("Endet nach Freitag 20:30 Uhr – zählt erst für die nächste Woche")
                             }
                         }
                     }
@@ -327,7 +327,7 @@ struct AutoTransferView: View {
                     TableColumn("Endet") { p in
                         HStack(spacing: 4) {
                             Text(Fmt.remaining(p.expiresAt))
-                            if (p.expiresAt ?? .distantFuture) >= plan.freeFrom {
+                            if (p.expiresAt ?? .distantFuture) > plan.deadline {
                                 Text("nach Stichtag").font(.caption2)
                                     .padding(.horizontal, 4)
                                     .background(Color.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
@@ -426,7 +426,7 @@ extension BacktestBox {
     }
 }
 
-/// Warning before the Friday 19:00 budget deadline.
+/// Warning before the Friday 20:30 budget deadline.
 struct DeadlineBanner: View {
     let budget: Double
     let plan: AutoPlan?

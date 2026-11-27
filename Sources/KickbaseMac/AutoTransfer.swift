@@ -49,12 +49,13 @@ enum AutoRules {
     static let riseTolerancePct = 0.5
     /// Backtest window in days.
     static let backtestDays = 120
-    /// Budget deadline: every Friday 19:00 (German time).
+    /// Budget deadline: every Friday 20:30 (German time). Purchases that complete after it
+    /// count for the following week and may push the budget below zero again right away.
     static let deadlineWeekday = 6 // Sunday = 1 … Friday = 6
-    static let deadlineHour = 19
-    /// Purchases that complete from Friday 20:00 on count for the following week
-    /// and may push the budget below zero.
-    static let freeWindowHour = 20
+    static let deadlineHour = 20
+    static let deadlineMinute = 30
+    /// Kickbase updates all market values once a day at 22:00 (German time).
+    static let marketValueUpdateHour = 22
     /// Total bids may push the budget down to −30 % of the team value (league rule).
     static let maxDebtShareOfTeamValue = 0.30
     /// From this many hours before the deadline the sale plan is pushed.
@@ -66,11 +67,11 @@ enum AutoRules {
         return c
     }
 
-    /// Next Friday 19:00 Europe/Berlin (today if it is still before 19:00 on a Friday).
+    /// Next Friday 20:30 Europe/Berlin (today if it is still before 20:30 on a Friday).
     static func nextDeadline(after now: Date = Date()) -> Date {
         berlin.nextDate(
             after: now,
-            matching: DateComponents(hour: deadlineHour, minute: 0, second: 0, weekday: deadlineWeekday),
+            matching: DateComponents(hour: deadlineHour, minute: deadlineMinute, second: 0, weekday: deadlineWeekday),
             matchingPolicy: .nextTime
         ) ?? now.addingTimeInterval(7 * 86_400)
     }
@@ -216,7 +217,7 @@ struct TrendEvaluation: Hashable {
 }
 
 /// History with today's market value appended – only if it is a new value.
-/// Kickbase updates market values once a day (around 22:00); before that the current
+/// Kickbase updates market values once a day at 22:00; before that the current
 /// value equals the last history point and appending it would fake a "flat" day.
 func historyWithCurrent(_ h: [MVPoint], current: Double, now: Date) -> [MVPoint] {
     guard current > 0 else { return h }
@@ -317,7 +318,7 @@ struct BuyProposal: Identifiable, Hashable {
     /// Expected sale value (capped at the last peak) minus the bid.
     let expectedGain: Double
     let trend: TrendEvaluation
-    /// Auction ends Friday 20:00 or later – does not count for this week's balance.
+    /// Auction ends after Friday 20:30 – does not count for this week's balance.
     let afterDeadline: Bool
     var id: String { player.id }
     var bidOverMVPct: Double { player.marketValue > 0 ? (bid / player.marketValue - 1) * 100 : 0 }
@@ -352,8 +353,6 @@ struct AutoPlan {
     /// All my open bids, including auctions ending after the deadline.
     var allOpenBids: Double = 0
     var deadline = AutoRules.nextDeadline()
-    /// Friday 20:00 – auctions ending from here on count for the following week.
-    var freeFrom = AutoRules.nextDeadline().addingTimeInterval(3600)
     var budgetAfterSales: Double = 0
     /// Budget minus open bids ending before the deadline (basis of the Friday balance).
     var committedBudget: Double = 0
@@ -395,9 +394,6 @@ enum AutoPlanner {
             .reduce(0, +)
         let committedBudget = budget - plan.openBids
         plan.committedBudget = committedBudget
-        plan.freeFrom = plan.deadline.addingTimeInterval(
-            Double(AutoRules.freeWindowHour - AutoRules.deadlineHour) * 3600
-        )
 
         // League rule: all bids together may push the budget to at most −30 % of the team value.
         let teamValue = squad.reduce(0) { $0 + $1.marketValue }
@@ -460,8 +456,7 @@ enum AutoPlanner {
                 expectedGain = profit
             }
             let ends = p.expiresAt ?? .distantFuture
-            let afterDeadline = ends >= plan.freeFrom
-            let inGap = ends > plan.deadline && ends < plan.freeFrom
+            let afterDeadline = ends > plan.deadline
 
             // Only bid on the day the listing ends: by then the trend is more reliable.
             let endsToday = p.expiresAt.map { AutoRules.berlin.isDate($0, inSameDayAs: now) } ?? false
@@ -474,8 +469,6 @@ enum AutoPlanner {
                 plan.skipped.append(.init(player: p, reason: "Kader voll (\(AutoRules.maxSquadSize))"))
             } else if perClub[p.teamId, default: 0] >= AutoRules.maxPerClub {
                 plan.skipped.append(.init(player: p, reason: "Schon \(AutoRules.maxPerClub) Spieler dieses Vereins"))
-            } else if inGap {
-                plan.skipped.append(.init(player: p, reason: "Endet Freitag zwischen 19 und 20 Uhr"))
             } else if bid > globalRemaining {
                 plan.skipped.append(.init(player: p, reason: "Über der Minus-Grenze (−\(Int(AutoRules.maxDebtShareOfTeamValue * 100)) % Teamwert)"))
             } else if !afterDeadline && bid > remaining {

@@ -184,7 +184,7 @@ class KickbaseAutomation:
         self._alerted_deadline = deadline
         plan = self.coordinator.data.plan
         items = [OrderItem(s.player.id, s.player.full_name, s.expected_proceeds) for s in plan.sales]
-        text = f"Budget nach Geboten {eur(plan.committed_budget)} – bis Freitag 19:00 ausgleichen."
+        text = f"Budget nach Geboten {eur(plan.committed_budget)} – bis Freitag 20:30 ausgleichen."
         if items:
             self.entry.async_create_background_task(
                 self.hass,
