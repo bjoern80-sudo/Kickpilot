@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
+
 import aiohttp
 import voluptuous as vol
+
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
@@ -11,6 +17,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, Supp
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.helpers.typing import ConfigType
 
 from .api import KickbaseApi
 from .automation import KIND_BUYS, KIND_SALES, KickbaseAutomation, Order, OrderItem
@@ -26,6 +33,20 @@ SERVICE_EXECUTE = "vorschlaege_ausfuehren"
 KIND = vol.In([KIND_BUYS, KIND_SALES])
 
 type KickbaseConfigEntry = ConfigEntry[KickbaseCoordinator]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+CARD_FILE = Path(__file__).parent / "frontend" / "kickpilot-card.js"
+CARD_URL = "/kickbase/kickpilot-card.js"
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Serve the Kickpilot dashboard card and load it in every frontend session."""
+    content = await hass.async_add_executor_job(CARD_FILE.read_bytes)
+    version = hashlib.sha1(content).hexdigest()[:8]  # new file → new URL → no stale cache
+    await hass.http.async_register_static_paths([StaticPathConfig(CARD_URL, str(CARD_FILE), True)])
+    add_extra_js_url(hass, f"{CARD_URL}?v={version}")
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: KickbaseConfigEntry) -> bool:

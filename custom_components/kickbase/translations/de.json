@@ -52,7 +52,8 @@
           "max_bid_sum_per_day": "Höchste Gebotssumme pro Tag",
           "max_sales_per_friday": "Höchstens Verkäufe pro Freitag",
           "confirm_valid_hours": "Gültigkeit einer Bestätigung",
-          "dry_run": "Trockenlauf"
+          "dry_run": "Trockenlauf",
+          "design": "Design des Dashboards"
         },
         "data_description": {
           "scan_interval": "Wie oft Budget, Kader, Markt und Tabelle neu geladen werden.",
@@ -68,7 +69,8 @@
           "max_bid_sum_per_day": "Gilt nur für die Vollautomatik.",
           "max_sales_per_friday": "Gilt nur für die Vollautomatik.",
           "confirm_valid_hours": "Danach wird ein Tipp auf „Bestätigen“ abgelehnt.",
-          "dry_run": "Nur protokollieren, nichts ausführen. Erst ausschalten, wenn alles geprüft ist."
+          "dry_run": "Nur protokollieren, nichts ausführen. Erst ausschalten, wenn alles geprüft ist.",
+          "design": "Aussehen der Kickpilot-Karte (custom:kickpilot-card)."
         }
       }
     },
@@ -89,6 +91,12 @@
       "options": {
         "kaeufe": "Käufe (Gebote)",
         "verkaeufe": "Verkäufe"
+      }
+    },
+    "design": {
+      "options": {
+        "app": "App-Design (dunkel, Kickpilot)",
+        "ha": "Home-Assistant-Design (folgt deinem Theme)"
       }
     }
   },

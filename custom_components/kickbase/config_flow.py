@@ -31,6 +31,8 @@ from .const import (
     CONF_LEAGUE_ID,
     CONF_LEAGUE_NAME,
     DEFAULT_OPTIONS,
+    DESIGN_APP,
+    DESIGN_HA,
     DOMAIN,
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
@@ -38,6 +40,7 @@ from .const import (
     MODE_SEMI,
     OPT_CHECK_TIMES,
     OPT_CONFIRM_VALID_HOURS,
+    OPT_DESIGN,
     OPT_DRY_RUN,
     OPT_FRIDAY_TIMES,
     OPT_FULL_AUTO_ACK,
@@ -244,6 +247,13 @@ class KickbaseOptionsFlow(OptionsFlow):
                 vol.Required(OPT_MAX_SALES_PER_FRIDAY): _number(1, 10, 1),
                 vol.Required(OPT_CONFIRM_VALID_HOURS): _number(1, 24, 1, "h"),
                 vol.Required(OPT_DRY_RUN): BooleanSelector(),
+                vol.Required(OPT_DESIGN): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[DESIGN_APP, DESIGN_HA],
+                        translation_key="design",
+                        mode=SelectSelectorMode.LIST,
+                    )
+                ),
             }
         )
         current = {**DEFAULT_OPTIONS, **self.config_entry.options, **(user_input or {})}

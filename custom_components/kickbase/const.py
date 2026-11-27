@@ -22,9 +22,13 @@ OPT_MAX_BIDS_PER_RUN = "max_bids_per_run"
 OPT_MAX_BID_SUM_PER_DAY = "max_bid_sum_per_day"
 OPT_MAX_SALES_PER_FRIDAY = "max_sales_per_friday"
 OPT_DRY_RUN = "dry_run"
+OPT_DESIGN = "design"  # DESIGN_APP | DESIGN_HA (look of the Kickpilot card)
 
 MODE_SEMI = "semi"
 MODE_FULL = "full"
+
+DESIGN_APP = "app"
+DESIGN_HA = "ha"
 
 DEFAULT_OPTIONS: dict = {
     OPT_SCAN_INTERVAL: 15,
@@ -41,6 +45,7 @@ DEFAULT_OPTIONS: dict = {
     OPT_MAX_BID_SUM_PER_DAY: 20_000_000,
     OPT_MAX_SALES_PER_FRIDAY: 3,
     OPT_DRY_RUN: True,
+    OPT_DESIGN: DESIGN_APP,
 }
 
 MIN_SCAN_INTERVAL = 5

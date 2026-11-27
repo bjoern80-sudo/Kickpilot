@@ -52,7 +52,8 @@
           "max_bid_sum_per_day": "Max bid sum per day",
           "max_sales_per_friday": "Max sales per Friday",
           "confirm_valid_hours": "Confirmation validity",
-          "dry_run": "Dry run"
+          "dry_run": "Dry run",
+          "design": "Dashboard design"
         },
         "data_description": {
           "scan_interval": "How often budget, squad, market and table are reloaded.",
@@ -68,7 +69,8 @@
           "max_bid_sum_per_day": "Full automation only.",
           "max_sales_per_friday": "Full automation only.",
           "confirm_valid_hours": "After this, a tap on Confirm is rejected.",
-          "dry_run": "Only log, never execute."
+          "dry_run": "Only log, never execute.",
+          "design": "Look of the Kickpilot card (custom:kickpilot-card)."
         }
       }
     },
@@ -89,6 +91,12 @@
       "options": {
         "kaeufe": "Buys (bids)",
         "verkaeufe": "Sales"
+      }
+    },
+    "design": {
+      "options": {
+        "app": "App look (dark, Kickpilot)",
+        "ha": "Home Assistant look (follows your theme)"
       }
     }
   },

@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from . import KickbaseConfigEntry
+from .const import OPT_DESIGN, OPT_DRY_RUN, opt
 from .entity import KickbaseEntity
 
 
@@ -29,6 +30,12 @@ class AutomationSwitch(KickbaseEntity, SwitchEntity, RestoreEntity):
         last = await self.async_get_last_state()
         if last is not None and last.state in ("on", "off"):
             self.coordinator.automation.enabled = last.state == "on"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Read by the Kickpilot card (design and dry-run badge)."""
+        options = self.coordinator.config_entry.options
+        return {"design": opt(options, OPT_DESIGN), "trockenlauf": bool(opt(options, OPT_DRY_RUN))}
 
     @property
     def is_on(self) -> bool:

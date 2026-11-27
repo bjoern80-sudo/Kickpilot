@@ -73,6 +73,11 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   Dateien nachziehen.
 - Installieren beim Entwickeln: per SSH (`hassio@homeassistant.local`, mit `sudo tar`) nach
   `/config/custom_components/kickbase/` kopieren, dann HA neu starten (Module werden nur beim Start geladen).
+- Dashboard-Karte `frontend/kickpilot-card.js` (`type: custom:kickpilot-card`, Vanilla-Web-Component ohne
+  Build-Schritt): wird von `async_setup` unter `/kickbase/kickpilot-card.js?v=<hash>` ausgeliefert und per
+  `add_extra_js_url` geladen. Findet Entitäten über `hass.entities` (platform `kickbase` + translation_key).
+  Design `app`/`ha` kommt aus der Option „Design des Dashboards“ (Attribut `design` am Automatik-Schalter).
+  Schreibaktionen in der Karte immer mit eigenem Bestätigungsdialog.
 - Standard ist halbautomatisch; Vollautomatik nur nach ausdrücklichem Einschalten im Options-Flow
   (mit Pflicht-Häkchen), Trockenlauf standardmäßig an.
 
