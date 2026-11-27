@@ -89,6 +89,13 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
 - Standard ist halbautomatisch; Vollautomatik nur nach ausdrücklichem Einschalten im Options-Flow
   (mit Pflicht-Häkchen), Trockenlauf standardmäßig an.
 
+## README (GitHub-Beschreibung)
+- `README.md` ist die öffentliche Beschreibung auf GitHub, Schwerpunkt Home Assistant, Mac-App nur am Rand.
+  Zielgruppe: Kickbase-Spieler mit Home Assistant, Installation über HACS (benutzerdefiniertes Repository).
+- Bei jeder Änderung, die Nutzer betrifft (neue/geänderte Funktionen, Einstellungen und Standardwerte,
+  Entitäten, Aktionen, Events, Kartenoptionen, Ligaregeln, Gebotslogik, Voraussetzungen), die README im
+  selben Commit nachziehen, damit sie mit gepusht wird.
+
 ## Regeln
 - Schreibende Aufrufe (Gebote, Verkäufe, Aufstellung) sind ECHTE Transaktionen:
   in der UI immer mit Bestätigungsdialog; beim Entwickeln niemals selbst auslösen.
