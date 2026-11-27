@@ -35,6 +35,10 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   `prc` = Kaufpreis, `mvgl` = MW-Gewinn seit Kauf.
 - Spielerdetails `/v4/leagues/{lid}/players/{pid}`: Nachname `ln` (statt `n`),
   Punkte `tp` (statt `p`), dazu `mv`, `tfhmvt`, `pos`, `st`, `ap`, `oui` (Besitzer).
+- Aufstellung: eigener Kader `/squad` hat `lo` (0–10 = Startelf-Platz, fehlt = Bank); Formation = Anzahl je
+  Position. `/lineup` liefert dasselbe plus `os` = Kürzel des NÄCHSTEN GEGNERS (nicht des eigenen Vereins!).
+- Vereinsnamen: `/v4/competitions/1/table` → `it[]` mit `tid`, `tn` (Kurzname, z. B. „M'gladbach“).
+  Die Karte ordnet `tn` Kürzel + Vereinsfarben zu (`CLUBS` in `kickpilot-card.js`, keine Logos – Urheberrecht).
 - Antwortformate sind nicht offiziell dokumentiert: bei neuen Endpunkten erst eine
   echte Antwort ansehen (z. B. per kleinem Debug-Aufruf oder MCP-Tool), dann parsen.
   Unbekannte Felder tolerant behandeln (Optionals/Defaults), nie crashen.
