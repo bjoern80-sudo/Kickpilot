@@ -78,6 +78,8 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   `add_extra_js_url` geladen. Findet Entitäten über `hass.entities` (platform `kickbase` + translation_key).
   Design `app`/`ha` kommt aus der Option „Design des Dashboards“ (Attribut `design` am Automatik-Schalter).
   Schreibaktionen in der Karte immer mit eigenem Bestätigungsdialog.
+- Logo (Fußball mit Pilotenschwingen): Quelle `branding/generate_logo.py` (SVG), PNGs für HA mit
+  `branding/make_brand.sh` nach `custom_components/kickbase/brand/` (icon, logo, dark_logo, je @2x).
 - Standard ist halbautomatisch; Vollautomatik nur nach ausdrücklichem Einschalten im Options-Flow
   (mit Pflicht-Häkchen), Trockenlauf standardmäßig an.
 
