@@ -41,9 +41,16 @@ def _squad_attrs(d: KickbaseData) -> dict[str, Any]:
                 "schnitt": round(p.average_points, 1),
                 "fit": p.is_fit,
                 "auf_transfermarkt": p.on_market,
+                "verein": p.team_id,
+                "startelf": p.lineup_slot,
             }
             for p in players
-        ]
+        ],
+        "vereine": {
+            tid: d.team_names[tid]
+            for tid in sorted({p.team_id for p in (*d.squad, *d.market)})
+            if tid in d.team_names
+        },
     }
 
 
@@ -53,6 +60,7 @@ def _bid_attrs(d: KickbaseData) -> dict[str, Any]:
             {
                 "id": p.id,
                 "name": p.full_name,
+                "verein": p.team_id,
                 "gebot": round(p.my_offer_price or 0),
                 "marktwert": round(p.market_value),
                 "endet": _iso(p.expires_at),
@@ -77,6 +85,7 @@ def _buy_attrs(d: KickbaseData) -> dict[str, Any]:
             {
                 "id": b.player.id,
                 "name": b.player.full_name,
+                "verein": b.player.team_id,
                 "position": b.player.position_name,
                 "marktwert": round(b.player.market_value),
                 "gebot": round(b.bid),
@@ -109,6 +118,7 @@ def _sale_attrs(d: KickbaseData) -> dict[str, Any]:
             {
                 "id": s.player.id,
                 "name": s.player.full_name,
+                "verein": s.player.team_id,
                 "position": s.player.position_name,
                 "erloes": round(s.expected_proceeds),
                 "gewinn_pct": round(s.gain_pct, 1),

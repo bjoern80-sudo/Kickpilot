@@ -69,6 +69,7 @@ class KickbaseData:
     profiles: list[BidderProfile] = field(default_factory=list)
     history_loaded_at: datetime | None = None
     transfer_count: int = 0
+    team_names: dict[str, str] = field(default_factory=dict)
 
     @property
     def team_value(self) -> float:
@@ -98,6 +99,7 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
         self._entries: dict[str, list[ManagerTransferEntry]] = {}
         self._transfers: list[Transfer] = []
         self._history: dict[str, list[MVPoint]] = {}
+        self._team_names: dict[str, str] = {}
         self._history_loaded_at: datetime | None = None
         self._history_lock = asyncio.Lock()
         self._backtest: BacktestResult | None = None
@@ -325,6 +327,14 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
         except KickbaseError as err:
             raise UpdateFailed(str(err)) from err
 
+        # Vereinsnamen nur fürs Dashboard – nachladen, wenn ein unbekannter Verein auftaucht.
+        tids = {p.team_id for p in (*squad, *market) if p.team_id}
+        if not tids <= self._team_names.keys():
+            try:
+                self._team_names = await self.api.team_names()
+            except KickbaseError as err:
+                _LOGGER.debug("Vereinsnamen nicht geladen: %s", err)
+
         my_id = self.api.user_id
         # Snapshot in the event loop – the background load may change the dicts meanwhile.
         plan, profiles = await self.hass.async_add_executor_job(
@@ -349,6 +359,7 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
             profiles=profiles,
             history_loaded_at=self._history_loaded_at,
             transfer_count=len(self._transfers),
+            team_names=dict(self._team_names),
         )
 
     def _compute_plan(

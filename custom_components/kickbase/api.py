@@ -148,6 +148,15 @@ class KickbaseApi:
         managers = [Manager.from_json(x) for x in _arr(j.get("us"))]
         return sorted(managers, key=lambda m: m.placement)
 
+    async def team_names(self, competition_id: str = "1") -> dict[str, str]:
+        """Vereins-ID → Kurzname (`tn`) aus der Tabelle des Wettbewerbs."""
+        j = await self._get(f"/v4/competitions/{competition_id}/table")
+        out: dict[str, str] = {}
+        for row in j.get("it") or []:
+            if isinstance(row, dict) and (tid := text(row.get("tid"))):
+                out[tid] = text(row.get("tn")) or tid
+        return out
+
     async def manager_transfers(
         self, league: str, user_id: str, start: int
     ) -> list[ManagerTransferEntry]:

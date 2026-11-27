@@ -86,6 +86,7 @@ class Player:
     on_market: bool
     my_offer_price: float | None
     gain_since_purchase: float | None
+    lineup_slot: int | None = None  # `lo`: 0–10 = in der Startelf, None = Bank
 
     @classmethod
     def from_json(cls, p: dict, fetched_at: datetime | None = None) -> Player:
@@ -119,6 +120,7 @@ class Player:
             on_market=bool(p.get("iotm")),
             my_offer_price=my_offer if my_offer and my_offer > 0 else None,
             gain_since_purchase=num(p.get("mvgl")),
+            lineup_slot=int(lo) if (lo := num(p.get("lo"))) is not None else None,
         )
 
     @property

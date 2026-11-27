@@ -25,6 +25,55 @@ const KEYS = {
   mode_sales: ["select", "_betriebsart_verkaufe"],
 };
 
+// ---- Vereine: Kürzel + Vereinsfarben als Muster (keine Logos) -------------
+// Kickbase-Vereins-ID → Kurzname (wie in /competitions/1/table); weitere Namen
+// liefert die Integration im Attribut `vereine` des Kader-Sensors.
+const TEAM_NAMES = {
+  2: "Bayern", 3: "Dortmund", 4: "Frankfurt", 5: "Freiburg", 6: "Hamburg", 7: "Leverkusen", 8: "Schalke",
+  9: "Stuttgart", 10: "Bremen", 13: "Augsburg", 14: "Hoffenheim", 15: "M'gladbach", 18: "Mainz", 28: "Köln",
+  29: "Paderborn", 40: "Union Berlin", 43: "Leipzig", 77: "Elversberg",
+};
+const W = "#ffffff", K = "#111111";
+const half = (a, b, deg) => `linear-gradient(${deg}deg, ${a} 50%, ${b} 50%)`;
+const tri = (a, b, c, deg) => `linear-gradient(${deg}deg, ${a} 0 33.3%, ${b} 0 66.6%, ${c} 0)`;
+const stripes = (a, b, deg) => `repeating-linear-gradient(${deg}deg, ${a} 0 25%, ${b} 25% 50%)`;
+const band = (a, b, deg) => `linear-gradient(${deg}deg, ${a} 0 38%, ${b} 38% 62%, ${a} 62%)`;
+const ring = (inner, outer) => `radial-gradient(circle, ${inner} 0 50%, ${outer} 53%)`;
+const quarters = (a, b) => `conic-gradient(${a} 0 25%, ${b} 0 50%, ${a} 0 75%, ${b} 0)`;
+const CLUBS = {
+  // Rot-Weiß: sechs Vereine, sechs Muster
+  "Bayern": ["FCB", quarters("#DC052D", W)],
+  "Stuttgart": ["VfB", band(W, "#E32219", 180)],
+  "Köln": ["KOE", half(W, "#ED1C24", 180)],
+  "Union Berlin": ["FCU", stripes("#D4011D", W, 90)],
+  "Mainz": ["M05", half("#C3141E", W, 135)],
+  "Leipzig": ["RBL", ring(W, "#DD0741")],
+  // Rot-Schwarz
+  "Leverkusen": ["B04", half(K, "#E32221", 90)],
+  "Frankfurt": ["SGE", half(K, "#E1000F", 180)],
+  "Freiburg": ["SCF", stripes("#E2001A", K, 180)],
+  // Blau
+  "Hoffenheim": ["TSG", half("#1C63B7", W, 90)],
+  "Schalke": ["S04", half("#004D9D", W, 180)],
+  "Hamburg": ["HSV", tri("#0A3F86", W, K, 180)],
+  "Paderborn": ["SCP", stripes("#005CA9", K, 90)],
+  // Schwarz-Weiß und eindeutige Farben
+  "Elversberg": ["SVE", half(K, W, 135)],
+  "M'gladbach": ["BMG", tri(K, W, "#00915A", 90)],
+  "Dortmund": ["BVB", half("#FDE100", K, 90)],
+  "Bremen": ["SVW", half("#1D9053", W, 90)],
+  "Augsburg": ["FCA", tri("#BA3733", W, "#46714D", 90)],
+  // Mögliche Aufsteiger späterer Saisons
+  "Wolfsburg": ["WOB", ring(W, "#65B32E")],
+  "Heidenheim": ["FCH", half("#E30613", "#003B79", 90)],
+  "St. Pauli": ["STP", half("#5C3A21", W, 90)],
+  "Bochum": ["BOC", half("#005CA9", W, 135)],
+  "Kiel": ["KSV", tri("#00438A", W, "#E3001B", 180)],
+  "Hertha": ["BSC", stripes("#005CA9", W, 180)],
+  "Darmstadt": ["SVD", quarters("#004E9E", W)],
+  "Düsseldorf": ["F95", band(W, "#E2001A", 135)],
+};
+const POS_ORDER = { TW: 1, ABW: 2, MIT: 3, ST: 4 };
 const POS_COLORS = { TW: "#f59e0b", ABW: "#60a5fa", MIT: "#a78bfa", ST: "#f87171" };
 const NUM = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
 const PCT = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -68,6 +117,7 @@ const STYLE = `
   --kp-bg:#12141a; --kp-card:#1c1f28; --kp-card2:#242836; --kp-line:#2a2f3c;
   --kp-text:#e9ebf0; --kp-mut:#8b90a0; --kp-accent:#22c55e; --kp-on-accent:#052e14;
   --kp-red:#f87171; --kp-green:#4ade80; --kp-amber:#fbbf24; --kp-radius:16px; --kp-border:none;
+  --kp-crest-ring:rgba(255,255,255,.28);
   --kp-font: Inter, "SF Pro Display", -apple-system, system-ui, sans-serif;
   background:var(--kp-bg); border-radius:var(--kp-radius); padding:20px; min-height:100%;
 }
@@ -77,7 +127,7 @@ const STYLE = `
   --kp-text:var(--primary-text-color); --kp-mut:var(--secondary-text-color);
   --kp-accent:var(--primary-color); --kp-on-accent:var(--text-primary-color, #fff);
   --kp-red:var(--error-color, #db4437); --kp-green:var(--success-color, #43a047); --kp-amber:var(--warning-color, #ffa600);
-  --kp-radius:var(--ha-card-border-radius, 12px);
+  --kp-radius:var(--ha-card-border-radius, 12px); --kp-crest-ring:var(--divider-color, rgba(0,0,0,.2));
   --kp-border:var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, #e0e0e0));
   --kp-font: var(--ha-font-family-body, var(--paper-font-body1_-_font-family, inherit));
   padding:8px 0;
@@ -147,10 +197,26 @@ button ha-icon { --mdc-icon-size:18px; }
 .seg button { background:none; color:var(--kp-mut); padding:6px 10px; border-radius:8px; font-size:12px; }
 .seg button.sel { background:var(--kp-card); color:var(--kp-text); box-shadow:0 1px 2px rgba(0,0,0,.25); }
 .seg button.sel.full { color:var(--kp-red); }
-.squad { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); column-gap:24px; }
-.squad .item:nth-child(-n+2) { border-top:none; }
-.rank { width:18px; font-size:12px; color:var(--kp-mut); text-align:right; flex:none; }
-.top11 .rank { color:var(--kp-accent); font-weight:700; }
+.crest { width:var(--cs, 18px); height:var(--cs, 18px); border-radius:50%; flex:none; display:inline-block;
+  box-shadow:0 0 0 1.5px var(--kp-crest-ring); }
+.club { display:inline-flex; align-items:center; gap:5px; margin-left:8px; font-size:11px; font-weight:600; color:var(--kp-mut);
+  vertical-align:1px; letter-spacing:.02em; }
+.club .crest { --cs:13px; box-shadow:0 0 0 1px var(--kp-crest-ring); }
+.pitch { position:relative; border-radius:14px; padding:14px 6px; overflow:hidden;
+  background:repeating-linear-gradient(180deg, #1f7a43 0 12.5%, #1b6e3c 12.5% 25%); border:2px solid rgba(255,255,255,.35); }
+.pitch .mark { position:absolute; border:2px solid rgba(255,255,255,.3); pointer-events:none; }
+.pitch .half { left:0; right:0; top:50%; border-width:2px 0 0; }
+.pitch .circle { left:50%; top:50%; width:84px; height:84px; margin:-42px; border-radius:50%; }
+.pitch .box { left:28%; right:28%; height:12%; }
+.pitch .box.t { top:-2px; border-top:none; } .pitch .box.b { bottom:-2px; border-bottom:none; }
+.line { position:relative; display:flex; justify-content:space-evenly; align-items:flex-start; padding:10px 0; }
+.pl { display:flex; flex-direction:column; align-items:center; gap:3px; width:96px; min-width:0; text-align:center; }
+.pl .crest { --cs:40px; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 3px 8px rgba(0,0,0,.35); }
+.pl .nm { max-width:100%; font-size:12px; font-weight:600; color:#fff; background:rgba(0,0,0,.55); border-radius:6px; padding:1px 6px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pl .cl { font-size:11px; color:#d7eadb; white-space:nowrap; }
+.pl .cl.neg { color:#fecaca; } .pl .cl.pos { color:#bbf7d0; }
+@container (max-width: 520px) { .pl { width:72px; } .pl .crest { --cs:32px; } }
 .overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:10; display:flex; align-items:center; justify-content:center; padding:16px; }
 .dialog { background:var(--kp-card); color:var(--kp-text); border-radius:18px; padding:22px; max-width:420px; width:100%;
   box-shadow:0 20px 60px rgba(0,0,0,.45); border:var(--kp-border); }
@@ -176,7 +242,6 @@ class KickpilotCard extends HTMLElement {
     this._busy = null;
     this._confirm = null;
     this._toast = null;
-    this._showAllSquad = false;
     this._sig = "";
     this.shadowRoot.addEventListener("click", (ev) => this._onClick(ev));
   }
@@ -304,10 +369,6 @@ class KickpilotCard extends HTMLElement {
         return this._call(`mode-${key}`, "select", "select_option", { entity_id: id, option });
       }
     }
-    if (act === "squad") {
-      this._showAllSquad = !this._showAllSquad;
-      this._render(true);
-    }
     if (act === "more") {
       const id = this._ids[arg];
       if (id) this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true }));
@@ -391,7 +452,8 @@ class KickpilotCard extends HTMLElement {
           ${this._sales()}
           ${this._bids()}
           ${this._automation()}
-          ${this._squad()}
+          ${this._lineup()}
+          ${this._bench()}
         </div>
       </div>
       ${this._dialog()}
@@ -515,7 +577,7 @@ class KickpilotCard extends HTMLElement {
       ? `<div class="list">${items
           .map(
             (b) => `<div class="item">${this._badge(b.position)}
-            <div class="grow"><div class="name">${esc(b.name)}${b.nach_frist ? " ⏰" : ""}</div>
+            <div class="grow"><div class="name">${esc(b.name)}${this._clubTag(b.verein)}${b.nach_frist ? " ⏰" : ""}</div>
             <div class="meta">MW ${eur(b.marktwert)} · ${esc(b.muster || "")}</div></div>
             <div class="right"><div class="name">${eur(b.gebot)}</div><div class="meta">+${PCT.format(b.aufpreis_pct)} % Aufpreis</div></div>
             <span class="pill green">+${mio(b.erwarteter_gewinn)}</span></div>`
@@ -542,7 +604,7 @@ class KickpilotCard extends HTMLElement {
       ? `<div class="list">${items
           .map(
             (s) => `<div class="item">${this._badge(s.position)}
-            <div class="grow"><div class="name">${esc(s.name)}</div><div class="meta">Gewinn ${esc(s.basis || "")}</div></div>
+            <div class="grow"><div class="name">${esc(s.name)}${this._clubTag(s.verein)}</div><div class="meta">Gewinn ${esc(s.basis || "")}</div></div>
             <div class="right"><div class="name">${eur(s.erloes)}</div></div>
             ${this._gain(s.gewinn_pct)}</div>`
           )
@@ -566,7 +628,7 @@ class KickpilotCard extends HTMLElement {
           .map((g) => {
             const over = g.marktwert ? ((g.gebot - g.marktwert) / g.marktwert) * 100 : null;
             return `<div class="item"><div class="badge" style="background:var(--kp-card2);color:var(--kp-mut)"><ha-icon icon="mdi:gavel" style="--mdc-icon-size:18px"></ha-icon></div>
-              <div class="grow"><div class="name">${esc(g.name)}</div><div class="meta">endet ${esc(shortDate(g.endet))} · MW ${eur(g.marktwert)}</div></div>
+              <div class="grow"><div class="name">${esc(g.name)}${this._clubTag(g.verein)}</div><div class="meta">endet ${esc(shortDate(g.endet))} · MW ${eur(g.marktwert)}</div></div>
               <div class="right"><div class="name">${eur(g.gebot)}</div><div class="meta">${pct(over)}</div></div></div>`;
           })
           .join("")}</div>`
@@ -598,22 +660,65 @@ class KickpilotCard extends HTMLElement {
     </div>`;
   }
 
-  _squad() {
+  _club(tid) {
+    const name = this._attr("squad_size", "vereine", {})?.[tid] || TEAM_NAMES[tid] || "";
+    const known = CLUBS[name];
+    if (known) return { abbr: known[0], bg: known[1], name };
+    const abbr = name ? name.replace(/[^A-Za-zÄÖÜäöü]/g, "").slice(0, 3).toUpperCase() : "?";
+    return { abbr, bg: half("#6b7280", "#9ca3af", 90), name: name || "unbekannter Verein" };
+  }
+
+  _crest(tid) {
+    const c = this._club(tid);
+    return `<span class="crest" style="background:${c.bg}" title="${esc(c.name)}"></span>`;
+  }
+
+  _clubTag(tid) {
+    if (!tid) return "";
+    return `<span class="club">${this._crest(tid)}${esc(this._club(tid).abbr)}</span>`;
+  }
+
+  _lineup() {
     const all = this._attr("squad_size", "spieler", []);
-    const shown = this._showAllSquad ? all : all.slice(0, 12);
-    const rows = shown
-      .map((p, i) => {
+    const xi = all.filter((p) => p.startelf != null).sort((a, b) => a.startelf - b.startelf);
+    const rows = ["ST", "MIT", "ABW", "TW"].map((pos) => xi.filter((p) => p.position === pos));
+    const formation = rows.slice(0, 3).reverse().map((r) => r.length).join("-");
+    const player = (p) => {
+      const t = p.trend_24h || 0;
+      return `<div class="pl">${this._crest(p.verein)}
+        <span class="nm" title="${esc(p.name)}">${esc(p.name)}${p.fit ? "" : " 🚑"}</span>
+        <span class="cl">${esc(this._club(p.verein).abbr)} · Ø ${NUM.format(p.schnitt)}</span>
+        <span class="cl ${t > 0 ? "pos" : t < 0 ? "neg" : ""}">${mio(p.marktwert)}</span></div>`;
+    };
+    const pitch = xi.length
+      ? `<div class="pitch"><div class="mark half"></div><div class="mark circle"></div><div class="mark box t"></div><div class="mark box b"></div>
+          ${rows.filter((r) => r.length).map((r) => `<div class="line">${r.map(player).join("")}</div>`).join("")}</div>`
+      : `<div class="empty">Keine Aufstellung gesetzt. Stell deine Startelf in der Kickbase-App auf.</div>`;
+    return `<div class="card s7">
+      <div class="head"><div class="h"><ha-icon icon="mdi:soccer-field"></ha-icon>Startelf</div>
+        <span class="sub">${xi.length ? `${formation} · ${xi.length} / 11` : ""}</span></div>
+      ${pitch}
+    </div>`;
+  }
+
+  _bench() {
+    const all = this._attr("squad_size", "spieler", []);
+    const bench = all
+      .filter((p) => p.startelf == null)
+      .sort((a, b) => (POS_ORDER[a.position] || 9) - (POS_ORDER[b.position] || 9) || b.schnitt - a.schnitt);
+    const rows = bench
+      .map((p) => {
         const t = p.trend_24h || 0;
-        return `<div class="item ${i < 11 ? "top11" : ""}"><span class="rank">${i + 1}</span>${this._badge(p.position)}
-          <div class="grow"><div class="name">${esc(p.name)}${p.fit ? "" : " 🚑"}${p.auf_transfermarkt ? " 🏷️" : ""}</div>
+        return `<div class="item">${this._badge(p.position)}
+          <div class="grow"><div class="name">${esc(p.name)}${this._clubTag(p.verein)}${p.fit ? "" : " 🚑"}${p.auf_transfermarkt ? " 🏷️" : ""}</div>
           <div class="meta">Ø ${PCT.format(p.schnitt)} · ${NUM.format(p.punkte)} Pkt.</div></div>
           <div class="right"><div class="name">${mio(p.marktwert)}</div><div class="meta ${t > 0 ? "pos" : t < 0 ? "neg" : ""}">${t > 0 ? "+" : ""}${eur(t)}</div></div></div>`;
       })
       .join("");
-    return `<div class="card s12">
-      <div class="head"><div class="h"><ha-icon icon="mdi:account-group-outline"></ha-icon>Kader</div><span class="sub">nach Ø-Punkten · Top 11 grün</span></div>
-      <div class="squad">${rows}</div>
-      ${all.length > 12 ? `<button class="link" data-act="squad">${this._showAllSquad ? "Weniger anzeigen" : `Alle ${all.length} anzeigen`}</button>` : ""}
+    return `<div class="card s5">
+      <div class="head"><div class="h"><ha-icon icon="mdi:seat-outline"></ha-icon>Ersatzbank</div><span class="count">${bench.length}</span></div>
+      ${bench.length ? `<div class="list">${rows}</div>` : `<div class="empty">Niemand auf der Bank.</div>`}
+      <div class="foot">Kader ${all.length} / 18 · nach Position, dann Ø-Punkten</div>
     </div>`;
   }
 
@@ -639,7 +744,7 @@ if (!customElements.get("kickpilot-card")) {
   window.customCards.push({
     type: "kickpilot-card",
     name: "Kickpilot",
-    description: "Kickbase-Dashboard: Budget, Frist, Vorschläge, Automatik und Kader.",
+    description: "Kickbase-Dashboard: Budget, Frist, Vorschläge, Automatik, Startelf und Ersatzbank.",
     preview: false,
   });
 }
