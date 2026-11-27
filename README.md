@@ -251,6 +251,10 @@ docs/                         Planung der HA-Integration
 Regeländerungen müssen immer in `planner.py` **und** `AutoTransfer.swift` nachgezogen werden.
 Fehler und Ideen gerne als [Issue](https://github.com/bjoern80-sudo/Kickpilot/issues).
 
+## Lizenz
+
+[MIT](LICENSE). Du darfst den Code frei verwenden, ändern und weitergeben. Es gibt keine Gewährleistung.
+
 ## Danke
 
 Die Kenntnisse über die Kickbase-API stammen aus [behretv/kickbase-mcp](https://github.com/behretv/kickbase-mcp).
