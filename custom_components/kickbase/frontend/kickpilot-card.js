@@ -21,6 +21,10 @@ const KEYS = {
   data_status: ["sensor", "_datenstand_transfers_und_marktwerte"],
   balance_needed: ["binary_sensor", "_ausgleich_notig"],
   lineup_problem: ["binary_sensor", "_aufstellung_prufen"],
+  upgrades: ["sensor", "_verstarkungen"],
+  trend_sales: ["sensor", "_verkaufssignale"],
+  league_gap: ["sensor", "_abstand_zum_ersten"],
+  capital: ["sensor", "_kapital"],
   automation: ["switch", "_automatik_aktiv"],
   mode_bids: ["select", "_betriebsart_gebote"],
   mode_sales: ["select", "_betriebsart_verkaufe"],
@@ -93,12 +97,30 @@ const INFO = {
     "Halbautomatisch: Vorschläge kommen aufs Handy, geboten wird erst nach deiner Bestätigung.\n" +
     "Vollautomatisch: Gebote werden ohne Rückfrage abgegeben, begrenzt durch Anzahl und Tagessumme aus den Einstellungen.",
   lineup:
-    "Kickpilot prüft deine Startelf vor jedem Anpfiff: Sind alle 11 Plätze besetzt, sind alle Spieler fit und hat ihr " +
-    "Verein an diesem Spieltag ein Spiel? Kickbase sperrt jeden Spieler, sobald sein Spiel angepfiffen ist – geprüft " +
-    "werden nur Spieler, die du noch tauschen kannst. Als Ersatz schlägt Kickpilot den fitten Bankspieler derselben " +
+    "Kickpilot prüft deine Startelf vor dem ersten Anpfiff des Spieltags (meist Freitag 20:30 Uhr): Sind alle 11 " +
+    "Plätze besetzt, sind alle Spieler fit und hat ihr Verein an diesem Spieltag ein Spiel? Bis dahin muss die " +
+    "Aufstellung stehen, danach gilt sie für den ganzen Spieltag. Als Ersatz schlägt Kickpilot den fitten Bankspieler derselben " +
     "Position mit dem besten Ø vor. Tipps zeigen Bankspieler, die im Schnitt mindestens 20 Punkte mehr holen.\n\n" +
-    "Die Warnung kommt per Push vor dem Anpfiff (Vorlauf in den Einstellungen). Ändern musst du die Aufstellung " +
+    "Die Warnung kommt per Push vor dem ersten Anpfiff (Vorlauf in den Einstellungen). Ändern musst du die Aufstellung " +
     "selbst in der Kickbase-App.",
+  upgrades:
+    "Punkteprognose für den nächsten Spieltag: halb Saison-Ø, halb Ø der letzten 4 Spieltage – mal Einsatzquote " +
+    "(verpasste Spiele zählen), angepasst an den Tabellenplatz des Gegners (±20 %) und Heim/Auswärts (±5 %). " +
+    "Angeschlagene zählen halb, Verletzte und Gesperrte 0.\n\n" +
+    "Vorgeschlagen werden Marktspieler, deren Angebot heute endet und die mindestens 20 Punkte mehr bringen als " +
+    "dein schwächster Starter derselben Position. Gebot und Budgetregeln wie bei den Kaufvorschlägen. " +
+    "Nie automatisch – immer mit Bestätigung.",
+  trend_sales:
+    "Spieler außerhalb deiner Top 11 (Ø-Punkte), deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem " +
+    "Hoch der letzten 14 Tage liegt. Verkauf an Kickbase bringt 100 % des aktuellen Marktwerts – vor dem nächsten " +
+    "Update um 22:00 Uhr noch den heutigen. Mindestbesetzung bleibt erhalten. Immer mit Bestätigung.",
+  radar:
+    "Alle Manager der Liga mit Gesamtpunkten, Abstand zum Ersten, Punkten am aktuellen Spieltag und Teamwert. " +
+    "🚑 zeigt verletzte oder gesperrte Spieler in der Startelf der Konkurrenz.",
+  capital:
+    "Kapital = Budget + Teamwert. Der Zuwachs pro Tag ist die Wertänderung deines heutigen Kaders in den letzten " +
+    "14 Tagen. Die Prognosen schreiben ihn bis zur Winterpause bzw. zum Saisonende fort – eine grobe Richtung, " +
+    "keine Garantie. Kaufkraft = Gebotsrahmen bis Freitag.",
   mode_sales:
     "Freitags zu den eingestellten Zeiten prüft Kickpilot, ob dein Budget nach offenen Geboten zur Frist " +
     "(20:30 Uhr) im Minus wäre. Dann schlägt es Verkäufe an Kickbase (100 % des Marktwerts) vor: zuerst die " +
@@ -137,6 +159,11 @@ function countdown(ms) {
   const m = Math.floor((ms % 3600000) / 60000);
   if (h >= 48) return `${Math.floor(h / 24)} Tage ${h % 24} h`;
   return `${h}:${String(m).padStart(2, "0")} h`;
+}
+
+function shortDay(iso) {
+  if (!iso) return "–";
+  return new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
 function shortDate(iso) {
@@ -276,6 +303,10 @@ button ha-icon { --mdc-icon-size:18px; }
 .root.ha .toast { background:var(--card-background-color, #fff); border:var(--kp-border); }
 .toast.err { border-left:4px solid var(--kp-red); }
 .warn { margin-bottom:12px; }
+.kv { display:flex; justify-content:space-between; gap:12px; font-size:13px; padding:6px 0; border-bottom:1px solid color-mix(in srgb, var(--kp-mut) 18%, transparent); }
+.kv:last-child { border-bottom:none; } .kv span { color:var(--kp-mut); }
+.item.me { background:color-mix(in srgb, var(--kp-accent) 12%, transparent); border-radius:10px; }
+.rank { width:22px; text-align:center; font-weight:700; color:var(--kp-mut); flex:none; }
 .lu { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
 .lu .row { display:flex; gap:8px; align-items:flex-start; font-size:13px; line-height:1.45; border-radius:10px; padding:8px 10px; }
 .lu .row ha-icon { --mdc-icon-size:18px; flex:none; margin-top:1px; }
@@ -439,8 +470,9 @@ class KickpilotCard extends HTMLElement {
   }
 
   _askExecute(kind) {
-    const buys = kind === "kaeufe";
-    const items = this._attr(buys ? "buy_proposals" : "sale_proposals", "vorschlaege", []);
+    const buys = kind === "kaeufe" || kind === "verstaerkung";
+    const source = { kaeufe: "buy_proposals", verkaeufe: "sale_proposals", verstaerkung: "upgrades", abwaertstrend: "trend_sales" }[kind];
+    const items = this._attr(source, "vorschlaege", []);
     if (!items.length) return;
     const dry = this._attr("automation", "trockenlauf", false);
     const lines = items.map((p) => `${p.name}: ${eur(buys ? p.gebot : p.erloes)}`);
@@ -513,6 +545,10 @@ class KickpilotCard extends HTMLElement {
           ${this._stats()}
           ${this._buys()}
           ${this._sales()}
+          ${this._upgrades()}
+          ${this._trendSales()}
+          ${this._radar()}
+          ${this._capital()}
           ${this._bids()}
           ${this._automation()}
           ${this._lineup()}
@@ -666,6 +702,88 @@ class KickpilotCard extends HTMLElement {
     </div>`;
   }
 
+  _upgrades() {
+    const items = this._attr("upgrades", "vorschlaege", []);
+    const day = this._attr("upgrades", "spieltag");
+    const body = items.length
+      ? `<div class="list">${items
+          .map(
+            (u) => `<div class="item">${this._badge(u.position)}
+            <div class="grow"><div class="name">${esc(u.name)}${this._clubTag(u.verein)}${u.nach_frist ? " ⏰" : ""}</div>
+            <div class="meta">Prognose ${NUM.format(u.prognose)} Pkt. statt ${esc(u.statt)} (${NUM.format(u.statt_prognose)})</div></div>
+            <div class="right"><div class="name">${eur(u.gebot)}</div><div class="meta">MW ${mio(u.marktwert)}</div></div>
+            <span class="pill green">+${NUM.format(u.plus_punkte)} Pkt.</span></div>`
+          )
+          .join("")}</div>
+          <div class="actions">
+            <button class="primary" data-act="execute" data-arg="verstaerkung" ${this._busy ? "disabled" : ""}><ha-icon icon="mdi:gavel"></ha-icon>${this._busy === "execute" ? "Läuft …" : "Gebote abgeben"}</button>
+            <button class="ghost" data-act="send" data-arg="verstaerkung" ${this._busy ? "disabled" : ""}><ha-icon icon="mdi:cellphone-message"></ha-icon>Aufs Handy</button>
+          </div>`
+      : `<div class="empty">Kein Marktspieler mit heutigem Ablauf bringt laut Prognose mindestens 20 Punkte mehr als dein schwächster Starter.</div>`;
+    return `<div class="card s6">
+      <div class="head"><div class="h"><ha-icon icon="mdi:arm-flex"></ha-icon>Verstärkungen${this._info_icon("upgrades")}</div><span class="count">${items.length}</span></div>
+      ${body}
+      <div class="foot">Punkteprognose für den ${day ?? "–"}. Spieltag · gleiche Budgetregeln wie bei den Kaufvorschlägen · immer mit Bestätigung</div>
+    </div>`;
+  }
+
+  _trendSales() {
+    const items = this._attr("trend_sales", "vorschlaege", []);
+    const body = items.length
+      ? `<div class="list">${items
+          .map(
+            (t) => `<div class="item">${this._badge(t.position)}
+            <div class="grow"><div class="name">${esc(t.name)}${this._clubTag(t.verein)}</div>
+            <div class="meta">${PCT.format(t.unter_hoch_pct)} % unter dem Hoch (${mio(t.hoch)}, ${esc(shortDay(t.hoch_am))})</div></div>
+            <div class="right"><div class="name">${eur(t.erloes)}</div><div class="meta">Erlös</div></div></div>`
+          )
+          .join("")}</div>
+          <div class="actions">
+            <button class="danger" data-act="execute" data-arg="abwaertstrend" ${this._busy ? "disabled" : ""}><ha-icon icon="mdi:cash-fast"></ha-icon>${this._busy === "execute" ? "Läuft …" : "Verkaufen"}</button>
+          </div>`
+      : `<div class="empty">Kein Spieler außerhalb deiner Top 11 verliert gerade deutlich an Wert.</div>`;
+    return `<div class="card s6">
+      <div class="head"><div class="h"><ha-icon icon="mdi:trending-down"></ha-icon>Verkaufssignale${this._info_icon("trend_sales")}</div><span class="count">${items.length}</span></div>
+      ${body}
+    </div>`;
+  }
+
+  _radar() {
+    const rows = this._attr("league_gap", "manager", []);
+    if (!rows.length) return "";
+    const body = rows
+      .map(
+        (r) => `<div class="item ${r.ich ? "me" : ""}"><span class="rank">${r.platz}</span>
+        <div class="grow"><div class="name">${esc(r.name)}${r.ich ? " (du)" : ""}</div>
+        <div class="meta">Teamwert ${mio(r.teamwert)} · Spieltag ${NUM.format(r.spieltag_punkte)} Pkt.${r.spieltag_platz ? ` (Platz ${r.spieltag_platz})` : ""}${
+          r.verletzt_in_startelf?.length ? ` · 🚑 ${esc(r.verletzt_in_startelf.join(", "))}` : ""
+        }</div></div>
+        <div class="right"><div class="name">${NUM.format(r.punkte)}</div><div class="meta">${r.abstand ? `−${NUM.format(r.abstand)}` : "Spitze"}</div></div></div>`
+      )
+      .join("");
+    return `<div class="card s6">
+      <div class="head"><div class="h"><ha-icon icon="mdi:podium"></ha-icon>Konkurrenz-Radar${this._info_icon("radar")}</div></div>
+      <div class="list">${body}</div>
+    </div>`;
+  }
+
+  _capital() {
+    const st = this._st("capital");
+    if (!st || st.state === "unavailable" || st.state === "unknown") return "";
+    const a = st.attributes || {};
+    const row = (label, value, cls = "") => `<div class="kv"><span>${label}</span><b class="${cls}">${value}</b></div>`;
+    const g = a.zuwachs_pro_tag;
+    return `<div class="card s6">
+      <div class="head"><div class="h"><ha-icon icon="mdi:finance"></ha-icon>Kapitalplan${this._info_icon("capital")}</div></div>
+      ${row("Kapital heute (Budget + Teamwert)", eur(num(st)))}
+      ${row("Zuwachs pro Tag (Ø 14 Tage)", `${g > 0 ? "+" : ""}${eur(g)}`, g > 0 ? "pos" : g < 0 ? "neg" : "")}
+      ${a.winterpause ? row(`Winterpause (${esc(shortDay(a.winterpause))})`, eur(a.kapital_winterpause)) : ""}
+      ${a.saisonende ? row(`Saisonende (${esc(shortDay(a.saisonende))})`, eur(a.kapital_saisonende)) : ""}
+      ${row("Kaufkraft bis Freitag", eur(a.kaufkraft))}
+      ${a.kaufkraft_winterpause != null ? row("Kaufkraft zur Winterpause (Prognose)", eur(a.kaufkraft_winterpause)) : ""}
+    </div>`;
+  }
+
   _sales() {
     const items = this._attr("sale_proposals", "vorschlaege", []);
     const before = this._attr("sale_proposals", "budget_nach_geboten");
@@ -757,7 +875,7 @@ class KickpilotCard extends HTMLElement {
       const t = p.trend_24h || 0;
       return `<div class="pl">${this._crest(p.verein)}
         <span class="nm" title="${esc(p.name)}">${esc(p.name)}${p.fit ? "" : " 🚑"}</span>
-        <span class="cl">${esc(this._club(p.verein).abbr)} · Ø ${NUM.format(p.schnitt)}</span>
+        <span class="cl">${esc(this._club(p.verein).abbr)} · Ø ${NUM.format(p.schnitt)}${p.prognose != null ? ` · ▸${NUM.format(p.prognose)}` : ""}</span>
         <span class="cl ${t > 0 ? "pos" : t < 0 ? "neg" : ""}">${mio(p.marktwert)}</span></div>`;
     };
     const pitch = xi.length
@@ -779,7 +897,7 @@ class KickpilotCard extends HTMLElement {
     const a = st.attributes || {};
     const problems = a.probleme || [];
     const tips = a.tipps || [];
-    const next = a.naechster_anpfiff;
+    const next = a.aufstellung_bis;
     const until = (i) => (i.bis ? ` · bis ${esc(shortDate(i.bis))} Uhr` : "");
     const rows = [
       ...problems.map((i) => {
@@ -793,10 +911,10 @@ class KickpilotCard extends HTMLElement {
           <div class="sub2">Stärker auf der Bank${until(i)}</div></div></div>`),
     ];
     const status = !next
-      ? `<span class="pill"><ha-icon icon="mdi:lock"></ha-icon>Spieltag ${a.spieltag ?? ""} läuft – alle Spiele angepfiffen</span>`
+      ? `<span class="pill"><ha-icon icon="mdi:lock"></ha-icon>Spieltag ${a.spieltag ?? ""} läuft – Aufstellung gesperrt</span>`
       : problems.length
-        ? `<span class="pill red"><ha-icon icon="mdi:alert"></ha-icon>Aufstellung prüfen · nächster Anpfiff ${esc(shortDate(next))} Uhr</span>`
-        : `<span class="pill green"><ha-icon icon="mdi:check"></ha-icon>Aufstellung ok · nächster Anpfiff ${esc(shortDate(next))} Uhr</span>`;
+        ? `<span class="pill red"><ha-icon icon="mdi:alert"></ha-icon>Aufstellung prüfen · bis ${esc(shortDate(next))} Uhr</span>`
+        : `<span class="pill green"><ha-icon icon="mdi:check"></ha-icon>Aufstellung ok · steht bis ${esc(shortDate(next))} Uhr</span>`;
     return `<div class="lu"><div class="pills">${status}${this._info_icon("lineup")}</div>${rows.join("")}</div>`;
   }
 
@@ -810,7 +928,7 @@ class KickpilotCard extends HTMLElement {
         const t = p.trend_24h || 0;
         return `<div class="item">${this._badge(p.position)}
           <div class="grow"><div class="name">${esc(p.name)}${this._clubTag(p.verein)}${p.fit ? "" : " 🚑"}${p.auf_transfermarkt ? " 🏷️" : ""}</div>
-          <div class="meta">Ø ${PCT.format(p.schnitt)} · ${NUM.format(p.punkte)} Pkt.</div></div>
+          <div class="meta">Ø ${PCT.format(p.schnitt)} · ${NUM.format(p.punkte)} Pkt.${p.prognose != null ? ` · Prognose ${NUM.format(p.prognose)}` : ""}</div></div>
           <div class="right"><div class="name">${mio(p.marktwert)}</div><div class="meta ${t > 0 ? "pos" : t < 0 ? "neg" : ""}">${t > 0 ? "+" : ""}${eur(t)}</div></div></div>`;
       })
       .join("");

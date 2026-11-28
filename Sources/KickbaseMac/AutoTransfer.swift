@@ -589,3 +589,157 @@ struct InjuryAlert: Identifiable, Hashable {
         Set(squad.filter { $0.status == injuredStatus }.map(\.id))
     }
 }
+
+// MARK: - Points forecast
+// Same as forecast_points in planner.py. Transparent rule of thumb: half season average,
+// half form of the last 4 matchdays, scaled by how often the player actually played, the
+// opponent's table position and home advantage.
+
+/// Points history: `ap` and `ph` (last 5 matchdays, NEWEST first; nil = not played).
+struct PlayerForm: Hashable, Sendable {
+    let playerId: String
+    let averagePoints: Double
+    let recent: [Double?]
+
+    init(json j: JSONObject, playerId: String? = nil) {
+        self.playerId = playerId ?? J.str(j["i"]) ?? ""
+        averagePoints = J.dbl(j["ap"]) ?? 0
+        recent = J.arr(j["ph"]).map { J.bool($0["hp"]) ? (J.dbl($0["p"]) ?? 0) : nil }
+    }
+}
+
+enum ForecastRules {
+    static let formWindow = 4
+    static let opponentSpread = 0.20
+    static let homeFactor = 1.05
+    static let awayFactor = 0.95
+    static let strickenFactor = 0.5
+    static let leagueSize = 18
+    /// Upgrade buys: forecast must beat the weakest starter of the same position by this much.
+    static let upgradeMinGain = 20.0
+}
+
+struct Fixture: Hashable { let opponentId: String; let home: Bool }
+
+enum PointsForecast {
+    /// Expected points of `player` on the next matchday (0 if he cannot play).
+    static func points(_ player: Player, form: PlayerForm?, fixture: Fixture?, tablePlace: [String: Int]) -> Double {
+        guard let fixture else { return 0 }
+        let statusFactor: Double
+        switch player.status {
+        case 0: statusFactor = 1
+        case 2: statusFactor = ForecastRules.strickenFactor
+        default: return 0
+        }
+        let avg = (form?.averagePoints ?? 0) > 0 ? form!.averagePoints : player.averagePoints
+        var recent = form?.recent ?? []
+        // ph[0] = current matchday; "not played" there usually means "not yet played".
+        if let first = recent.first, first == nil { recent.removeFirst() }
+        let window = Array(recent.prefix(ForecastRules.formWindow))
+        let played = window.compactMap { $0 }
+        let share: Double, base: Double
+        if window.isEmpty {
+            share = 1; base = avg
+        } else {
+            share = Double(played.count) / Double(window.count)
+            base = played.isEmpty ? 0 : 0.5 * avg + 0.5 * played.reduce(0, +) / Double(played.count)
+        }
+        let mid = Double(ForecastRules.leagueSize + 1) / 2
+        let opponent = tablePlace[fixture.opponentId].map {
+            1 + ForecastRules.opponentSpread * (Double($0) - mid) / (Double(ForecastRules.leagueSize) - mid)
+        } ?? 1
+        let venue = fixture.home ? ForecastRules.homeFactor : ForecastRules.awayFactor
+        return max(0, base * share * opponent * venue * statusFactor)
+    }
+}
+
+struct UpgradeProposal: Identifiable, Hashable {
+    let player: Player
+    let bid: Double
+    let forecast: Double
+    let replaces: Player
+    let replacesForecast: Double
+    let afterDeadline: Bool
+    var gain: Double { forecast - replacesForecast }
+    var id: String { player.id }
+
+    /// Market players that clearly beat my weakest starter of the same position (sporting buys).
+    /// Same budget rules as the trading buys. Read-only. Same as upgrade_proposals in planner.py.
+    static func proposals(plan: AutoPlan, squad: [Player], market: [Player], myUserId: String,
+                          forecasts: [String: Double], now: Date = Date()) -> [UpgradeProposal] {
+        let starters = squad.filter { $0.lineupSlot != nil }
+        let taken = Set(plan.buys.map(\.player.id))
+        var remaining = plan.bidLimit - plan.buys.filter { !$0.afterDeadline }.reduce(0) { $0 + $1.bid }
+        var globalRemaining = plan.globalLimit - plan.totalBids
+        var squadCount = squad.count + plan.buys.count
+        var perClub = Dictionary(grouping: squad + plan.buys.map(\.player), by: \.teamId).mapValues(\.count)
+        func fc(_ p: Player) -> Double { forecasts[p.id] ?? 0 }
+
+        var candidates: [(Double, Player, Player)] = []
+        for p in market {
+            guard !taken.contains(p.id), p.myOfferPrice == nil, p.sellerUserId != myUserId, p.isFit,
+                  let ends = p.expiresAt, AutoRules.berlin.isDate(ends, inSameDayAs: now) else { continue }
+            let same = starters.filter { $0.position == p.position }
+            guard let weakest = same.min(by: { fc($0) < fc($1) }) else { continue }
+            let gain = fc(p) - fc(weakest)
+            if gain >= ForecastRules.upgradeMinGain { candidates.append((gain, p, weakest)) }
+        }
+        var result: [UpgradeProposal] = []
+        var replaced = Set<String>()
+        for (_, p, weakest) in candidates.sorted(by: { $0.0 > $1.0 }) where !replaced.contains(weakest.id) {
+            let bid = plan.recommendedBid(for: p)
+            let afterDeadline = (p.expiresAt ?? .distantFuture) > plan.deadline
+            guard squadCount < AutoRules.maxSquadSize, perClub[p.teamId, default: 0] < AutoRules.maxPerClub,
+                  bid <= globalRemaining, afterDeadline || bid <= remaining else { continue }
+            result.append(.init(player: p, bid: bid, forecast: fc(p), replaces: weakest,
+                                replacesForecast: fc(weakest), afterDeadline: afterDeadline))
+            replaced.insert(weakest.id)
+            squadCount += 1
+            perClub[p.teamId, default: 0] += 1
+            globalRemaining -= bid
+            if !afterDeadline { remaining -= bid }
+        }
+        return result
+    }
+}
+
+// MARK: - Sell signal: falling market value
+// Same as trend_sales in planner.py. Players outside the best 11 whose market value has
+// fallen two days in a row and is clearly below its recent peak.
+
+enum TrendSaleRules {
+    static let fallingDays = 2
+    static let peakLookbackDays = 14
+    static let minDropPct = 3.0
+}
+
+struct TrendSale: Identifiable, Hashable {
+    let player: Player
+    let proceeds: Double
+    let dropPct: Double
+    let peak: Double
+    let peakDate: Date
+    var id: String { player.id }
+
+    static func signals(squad: [Player], history: [String: [MVPoint]], now: Date = Date()) -> [TrendSale] {
+        let core = Set(squad.sorted { $0.averagePoints > $1.averagePoints }.prefix(AutoRules.keepCore).map(\.id))
+        var perPosition = Dictionary(grouping: squad, by: \.position).mapValues(\.count)
+        var result: [TrendSale] = []
+        for p in squad where !core.contains(p.id) && !p.onMarket {
+            guard perPosition[p.position, default: 0] > (AutoRules.minPerPosition[p.position] ?? 0) else { continue }
+            let h = historyWithCurrent(history[p.id] ?? [], current: p.marketValue, now: now)
+            let n = TrendSaleRules.fallingDays
+            guard h.count >= n + 2 else { continue }
+            let tail = h.suffix(n + 1).map(\.value)
+            guard zip(tail, tail.dropFirst()).allSatisfy({ $1 < $0 }) else { continue }
+            let window = h.suffix(TrendSaleRules.peakLookbackDays)
+            guard let peak = window.max(by: { $0.value < $1.value }), peak.value > 0, let last = h.last else { continue }
+            let drop = (1 - last.value / peak.value) * 100
+            guard drop >= TrendSaleRules.minDropPct else { continue }
+            result.append(.init(player: p, proceeds: p.marketValue * AutoRules.kickbaseSaleFactor,
+                                dropPct: drop, peak: peak.value, peakDate: peak.date))
+            perPosition[p.position, default: 0] -= 1
+        }
+        return result.sorted { $0.dropPct > $1.dropPct }
+    }
+}

@@ -13,7 +13,7 @@ from typing import Any
 import aiohttp
 
 from .lineup import Match, Matchday
-from .models import League, Manager, ManagerTransferEntry, MVPoint, Player, num, text
+from .models import League, Manager, ManagerTransferEntry, MVPoint, Player, PlayerForm, num, text
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -149,14 +149,29 @@ class KickbaseApi:
         managers = [Manager.from_json(x) for x in _arr(j.get("us"))]
         return sorted(managers, key=lambda m: m.placement)
 
-    async def team_names(self, competition_id: str = "1") -> dict[str, str]:
-        """Vereins-ID → Kurzname (`tn`) aus der Tabelle des Wettbewerbs."""
+    async def team_table(self, competition_id: str = "1") -> dict[str, tuple[str, int]]:
+        """Vereins-ID → (Kurzname `tn`, Tabellenplatz `cpl`) aus der Tabelle des Wettbewerbs."""
         j = await self._get(f"/v4/competitions/{competition_id}/table")
-        out: dict[str, str] = {}
+        out: dict[str, tuple[str, int]] = {}
         for row in j.get("it") or []:
             if isinstance(row, dict) and (tid := text(row.get("tid"))):
-                out[tid] = text(row.get("tn")) or tid
+                out[tid] = (text(row.get("tn")) or tid, int(num(row.get("cpl")) or 0))
         return out
+
+    async def manager_squad(self, league: str, user_id: str) -> list[Player]:
+        """Another manager's squad (`pi`/`pn` instead of `i`/`n`)."""
+        j = await self._get(f"/v4/leagues/{league}/managers/{user_id}/squad")
+        return [Player.from_json(x) for x in _arr(j.get("it"))]
+
+    async def lineup_forms(self, league: str) -> dict[str, PlayerForm]:
+        """Own squad from /lineup: per player `ap` and `ph` (last 5 matchdays)."""
+        j = await self._get(f"/v4/leagues/{league}/lineup")
+        forms = (PlayerForm.from_json(x) for x in _arr(j.get("it")))
+        return {f.player_id: f for f in forms if f.player_id}
+
+    async def player_form(self, league: str, player_id: str) -> PlayerForm:
+        """Any player via /players/{id} (market players have no `ap` in the market list)."""
+        return PlayerForm.from_json(await self._get(f"/v4/leagues/{league}/players/{player_id}"), player_id)
 
     async def matchdays(self, competition_id: str = "1") -> list[Matchday]:
         """Season schedule: `it[]` = matchdays with `day` and `it[]` = matches

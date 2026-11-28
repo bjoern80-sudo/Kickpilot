@@ -26,6 +26,9 @@ OPT_DESIGN = "design"  # DESIGN_APP | DESIGN_HA (look of the Kickpilot card)
 OPT_LINEUP_WARN = "lineup_warn"  # warn before kick-off if the starting eleven has problems
 OPT_LINEUP_LEAD_HOURS = "lineup_lead_hours"
 OPT_INJURY_WARN = "injury_warn"  # push + sale proposal when an own player is reported injured
+OPT_UPGRADES = "upgrade_proposals"  # sporting buys (points forecast) at the check times
+OPT_TREND_SALES = "trend_sales"  # sale proposal when a non-core player's value keeps falling
+OPT_REVIEW = "matchday_review"  # push after each finished matchday
 
 MODE_SEMI = "semi"
 MODE_FULL = "full"
@@ -52,6 +55,9 @@ DEFAULT_OPTIONS: dict = {
     OPT_LINEUP_WARN: True,
     OPT_LINEUP_LEAD_HOURS: 2,
     OPT_INJURY_WARN: True,
+    OPT_UPGRADES: True,
+    OPT_TREND_SALES: True,
+    OPT_REVIEW: True,
 }
 
 MIN_SCAN_INTERVAL = 5

@@ -162,9 +162,22 @@ actor KickbaseAPI {
         var out: [String: Team] = [:]
         for row in J.arr(v["it"]) {
             guard let tid = J.str(row["tid"]) else { continue }
-            out[tid] = Team(id: tid, name: J.str(row["tn"]) ?? tid, placement: J.int(row["cp"]) ?? 0)
+            // `cpl` = table position (`cp` are the points).
+            out[tid] = Team(id: tid, name: J.str(row["tn"]) ?? tid, placement: J.int(row["cpl"]) ?? 0)
         }
         return out
+    }
+
+    /// Own squad from /lineup: per player `ap` and `ph` (last 5 matchdays, newest first).
+    func lineupForms(league: String) async throws -> [String: PlayerForm] {
+        let j = try await getObject("/v4/leagues/\(league)/lineup")
+        let forms = J.arr(j["it"]).map { PlayerForm(json: $0) }.filter { !$0.playerId.isEmpty }
+        return Dictionary(forms.map { ($0.playerId, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    /// Any player via /players/{id} (market players have no `ap` in the market list).
+    func playerForm(league: String, playerId: String) async throws -> PlayerForm {
+        PlayerForm(json: try await getObject("/v4/leagues/\(league)/players/\(playerId)"), playerId: playerId)
     }
 
     /// Season schedule: `it[]` = matchdays with `day` and `it[]` = matches

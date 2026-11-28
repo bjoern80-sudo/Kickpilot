@@ -37,15 +37,22 @@ from .const import (
     opt,
     parse_times,
 )
+from .insights import CapitalPlan, RivalInfo, capital_plan, last_finished_matchday, league_radar
 from .lineup import LineupCheck, Matchday, check_lineup, current_matchday
-from .models import Manager, ManagerTransferEntry, MVPoint, Player, Transfer
+from .models import Manager, ManagerTransferEntry, MVPoint, Player, PlayerForm, Transfer
 from .planner import (
     AutoPlan,
     AutoRules,
     BacktestResult,
     BidderProfile,
+    Fixture,
+    TrendSale,
+    UpgradeProposal,
+    forecast_points,
     make_plan,
     next_deadline,
+    trend_sales,
+    upgrade_proposals,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,6 +64,9 @@ PARALLEL = 4
 HISTORY_KEEP_DAYS = 200
 HISTORY_MAX_AGE = timedelta(hours=26)
 SCHEDULE_MAX_AGE = timedelta(hours=3)
+TABLE_MAX_AGE = timedelta(hours=6)
+FORM_MAX_AGE = timedelta(hours=6)
+RIVALS_MAX_AGE = timedelta(hours=1)
 STORE_VERSION = 1
 
 
@@ -74,6 +84,14 @@ class KickbaseData:
     transfer_count: int = 0
     team_names: dict[str, str] = field(default_factory=dict)
     lineup: LineupCheck | None = None
+    forecasts: dict[str, float] = field(default_factory=dict)  # player id → expected points
+    forecast_matchday: int | None = None
+    upgrades: list[UpgradeProposal] = field(default_factory=list)
+    trend_sales: list[TrendSale] = field(default_factory=list)
+    radar: list[RivalInfo] = field(default_factory=list)
+    capital: CapitalPlan | None = None
+    forms: dict[str, PlayerForm] = field(default_factory=dict)  # own squad (/lineup)
+    finished_matchday: int | None = None
 
     @property
     def team_value(self) -> float:
@@ -106,6 +124,11 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
         self._team_names: dict[str, str] = {}
         self._matchdays: list[Matchday] = []
         self._matchdays_at: datetime | None = None
+        self._table: dict[str, tuple[str, int]] = {}
+        self._table_at: datetime | None = None
+        self._market_forms: dict[str, tuple[PlayerForm, datetime]] = {}
+        self._rival_squads: dict[str, list[Player]] = {}
+        self._rivals_at: datetime | None = None
         self._history_loaded_at: datetime | None = None
         self._history_lock = asyncio.Lock()
         self._backtest: BacktestResult | None = None
@@ -114,6 +137,10 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
         # Set by __init__.py: KickbaseAutomation.async_on_schedule
         self.on_schedule: Callable[[str], Awaitable[None]] | None = None
         self.automation = None  # KickbaseAutomation, set by __init__.py
+
+    @property
+    def transfers(self) -> list[Transfer]:
+        return list(self._transfers)
 
     # ---- cache ------------------------------------------------------------
 
@@ -333,16 +360,18 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
         except KickbaseError as err:
             raise UpdateFailed(str(err)) from err
 
-        # Vereinsnamen nur fürs Dashboard – nachladen, wenn ein unbekannter Verein auftaucht.
+        now = dt_util.utcnow()
+        # Tabelle (Vereinsnamen + Platz für die Punkteprognose): alle 6 h oder bei neuem Verein.
         tids = {p.team_id for p in (*squad, *market) if p.team_id}
-        if not tids <= self._team_names.keys():
+        if not tids <= self._team_names.keys() or self._table_at is None or now - self._table_at > TABLE_MAX_AGE:
             try:
-                self._team_names = await self.api.team_names()
+                self._table = await self.api.team_table()
+                self._team_names = {tid: name for tid, (name, _) in self._table.items()}
+                self._table_at = now
             except KickbaseError as err:
-                _LOGGER.debug("Vereinsnamen nicht geladen: %s", err)
+                _LOGGER.debug("Tabelle nicht geladen: %s", err)
 
         # Spielplan (Anpfiffzeiten) für den Aufstellungs-Wächter – alle paar Stunden reicht.
-        now = dt_util.utcnow()
         if self._matchdays_at is None or now - self._matchdays_at > SCHEDULE_MAX_AGE:
             try:
                 self._matchdays = await self.api.matchdays()
@@ -366,6 +395,28 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
             list(self._transfers),
             self._history_loaded_at,
         )
+        forms, forecasts, fixture_day = await self._forecasts(league, squad, market, now)
+        upgrades = (
+            upgrade_proposals(
+                plan=plan, squad=squad, market=market, my_user_id=my_id, forecasts=forecasts, now=now
+            )
+            if forecasts
+            else []
+        )
+        sells = trend_sales(squad, dict(self._history), now) if self._history_loaded_at else []
+        radar = league_radar(managers, my_id, await self._rivals(league, managers, my_id, now))
+        capital = (
+            capital_plan(
+                budget=budget,
+                squad=squad,
+                history=dict(self._history),
+                matchdays=self._matchdays,
+                bid_limit=plan.bid_limit,
+                now=now,
+            )
+            if self._matchdays
+            else None
+        )
         return KickbaseData(
             budget=budget,
             squad=squad,
@@ -379,7 +430,84 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
             transfer_count=len(self._transfers),
             team_names=dict(self._team_names),
             lineup=lineup,
+            forecasts=forecasts,
+            forecast_matchday=fixture_day,
+            upgrades=upgrades,
+            trend_sales=sells,
+            radar=radar,
+            capital=capital,
+            forms=forms,
+            finished_matchday=last_finished_matchday(self._matchdays),
         )
+
+    async def _forecasts(
+        self, league: str, squad: list[Player], market: list[Player], now: datetime
+    ) -> tuple[dict[str, PlayerForm], dict[str, float], int | None]:
+        """Expected points for the next matchday that has not started (own squad + market)."""
+        upcoming = next(
+            (
+                d
+                for d in sorted(self._matchdays, key=lambda d: d.day)
+                if d.matches and all(m.status == 0 and m.kickoff > now for m in d.matches)
+            ),
+            None,
+        )
+        try:
+            forms = await self.api.lineup_forms(league)
+        except KickbaseError as err:
+            _LOGGER.debug("Aufstellung (Punkte) nicht geladen: %s", err)
+            forms = {}
+        # Market players: details (`ap`, `ph`) are missing in the market list – cache 6 h.
+        missing = [
+            p.id
+            for p in market
+            if p.id not in self._market_forms or now - self._market_forms[p.id][1] > FORM_MAX_AGE
+        ]
+        sem = asyncio.Semaphore(PARALLEL)
+
+        async def one(pid: str) -> None:
+            async with sem:
+                try:
+                    self._market_forms[pid] = (await self.api.player_form(league, pid), now)
+                except KickbaseError as err:
+                    _LOGGER.debug("Spielerdetails %s nicht geladen: %s", pid, err)
+
+        await asyncio.gather(*(one(pid) for pid in missing))
+        on_market = {p.id for p in market}
+        self._market_forms = {k: v for k, v in self._market_forms.items() if k in on_market}
+        if upcoming is None:
+            return forms, {}, None
+        place = {tid: pl for tid, (_, pl) in self._table.items() if pl}
+
+        def fixture(team_id: str) -> Fixture | None:
+            m = upcoming.kickoff_of(team_id)
+            if m is None:
+                return None
+            home = m.home_id == team_id
+            return Fixture(m.away_id if home else m.home_id, home)
+
+        forecasts = {p.id: forecast_points(p, forms.get(p.id), fixture(p.team_id), place) for p in squad}
+        for p in market:
+            form = self._market_forms.get(p.id, (None, None))[0]
+            forecasts[p.id] = forecast_points(p, form, fixture(p.team_id), place)
+        return forms, forecasts, upcoming.day
+
+    async def _rivals(
+        self, league: str, managers: list[Manager], my_id: str, now: datetime
+    ) -> dict[str, list[Player]]:
+        """Rival squads for the league radar (status of their starters) – hourly."""
+        if self._rivals_at is None or now - self._rivals_at > RIVALS_MAX_AGE:
+            async def one(uid: str) -> tuple[str, list[Player] | None]:
+                try:
+                    return uid, await self.api.manager_squad(league, uid)
+                except KickbaseError as err:
+                    _LOGGER.debug("Kader von %s nicht geladen: %s", uid, err)
+                    return uid, None
+
+            results = await asyncio.gather(*(one(m.id) for m in managers if m.id != my_id))
+            self._rival_squads.update({uid: sq for uid, sq in results if sq is not None})
+            self._rivals_at = now
+        return dict(self._rival_squads)
 
     def _compute_plan(
         self,

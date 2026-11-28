@@ -12,7 +12,7 @@ import hashlib
 import math
 from zoneinfo import ZoneInfo
 
-from .models import Manager, MVPoint, Player, Transfer
+from .models import Manager, MVPoint, Player, PlayerForm, Transfer
 
 BERLIN = ZoneInfo("Europe/Berlin")
 
@@ -263,7 +263,7 @@ class TrendEvaluation:
 
 
 def fmt_mio(value: float) -> str:
-    return f"{value / 1_000_000:.1f} Mio. €".replace(".", ",")
+    return f"{value / 1_000_000:.1f}".replace(".", ",") + " Mio. €"
 
 
 def fmt_signed_eur(value: float) -> str:
@@ -665,3 +665,186 @@ def injury_alerts(squad: list[Player], known_injured: set[str]) -> list[InjuryAl
 
 def injured_ids(squad: list[Player]) -> set[str]:
     return {p.id for p in squad if p.status == INJURED_STATUS}
+
+
+# ---- points forecast ---------------------------------------------------------------
+# Same as PointsForecast in AutoTransfer.swift. Transparent rule of thumb, no machine
+# learning: half season average, half form of the last 4 matchdays, scaled by how often
+# the player actually played, the opponent's table position and home advantage.
+
+
+class ForecastRules:
+    form_window = 4  # completed matchdays
+    opponent_spread = 0.20  # last-placed opponent +20 %, leader −20 %
+    home_factor = 1.05
+    away_factor = 0.95
+    stricken_factor = 0.5  # `st` 2 angeschlagen
+    league_size = 18
+    # Upgrade buys: forecast must beat the weakest starter of the same position by this much.
+    upgrade_min_gain = 20.0
+
+
+@dataclass(frozen=True)
+class Fixture:
+    opponent_id: str
+    home: bool
+
+
+def forecast_points(
+    player: Player, form: PlayerForm | None, fixture: Fixture | None, table_place: dict[str, int]
+) -> float:
+    """Expected points of `player` on the next matchday (0 if he cannot play)."""
+    if fixture is None:
+        return 0.0
+    if player.status == 2:
+        status_factor = ForecastRules.stricken_factor
+    elif player.status != 0:
+        return 0.0
+    else:
+        status_factor = 1.0
+    avg = form.average_points if form and form.average_points else player.average_points
+    recent = list(form.recent) if form else []
+    # ph[0] = current matchday; "not played" there usually means "not yet played".
+    if recent and recent[0] is None:
+        recent = recent[1:]
+    window = recent[: ForecastRules.form_window]
+    played = [x for x in window if x is not None]
+    if window:
+        share = len(played) / len(window)
+        base = 0.5 * avg + 0.5 * (sum(played) / len(played)) if played else 0.0
+    else:
+        share, base = 1.0, avg
+    place = table_place.get(fixture.opponent_id)
+    mid = (ForecastRules.league_size + 1) / 2
+    opponent = (
+        1 + ForecastRules.opponent_spread * (place - mid) / (ForecastRules.league_size - mid)
+        if place
+        else 1.0
+    )
+    venue = ForecastRules.home_factor if fixture.home else ForecastRules.away_factor
+    return max(0.0, base * share * opponent * venue * status_factor)
+
+
+@dataclass
+class UpgradeProposal:
+    player: Player
+    bid: float
+    forecast: float
+    replaces: Player
+    replaces_forecast: float
+    after_deadline: bool
+
+    @property
+    def gain(self) -> float:
+        return self.forecast - self.replaces_forecast
+
+
+def upgrade_proposals(
+    *,
+    plan: AutoPlan,
+    squad: list[Player],
+    market: list[Player],
+    my_user_id: str,
+    forecasts: dict[str, float],
+    now: datetime,
+) -> list[UpgradeProposal]:
+    """Market players that clearly beat my weakest starter of the same position (sporting buys).
+
+    Same budget rules as the trading buys (bid limit until Friday, debt limit, squad size,
+    club limit, only on the listing's last day). Read-only.
+    """
+    far = datetime.max.replace(tzinfo=timezone.utc)
+    starters = [p for p in squad if p.lineup_slot is not None]
+    taken = {b.player.id for b in plan.buys}
+    remaining = plan.bid_limit - sum(b.bid for b in plan.buys if not b.after_deadline)
+    global_remaining = plan.global_limit - plan.total_bids
+    squad_count = len(squad) + len(plan.buys)
+    per_club: dict[str, int] = {}
+    for p in [*squad, *(b.player for b in plan.buys)]:
+        per_club[p.team_id] = per_club.get(p.team_id, 0) + 1
+    today = now.astimezone(BERLIN).date()
+
+    candidates = []
+    for p in market:
+        if p.id in taken or p.my_offer_price or p.seller_user_id == my_user_id or not p.is_fit:
+            continue
+        if p.expires_at is None or p.expires_at.astimezone(BERLIN).date() != today:
+            continue
+        same = [s for s in starters if s.position == p.position]
+        if not same:
+            continue
+        weakest = min(same, key=lambda s: forecasts.get(s.id, 0.0))
+        gain = forecasts.get(p.id, 0.0) - forecasts.get(weakest.id, 0.0)
+        if gain >= ForecastRules.upgrade_min_gain:
+            candidates.append((gain, p, weakest))
+
+    result: list[UpgradeProposal] = []
+    replaced: set[str] = set()
+    for gain, p, weakest in sorted(candidates, key=lambda c: c[0], reverse=True):
+        if weakest.id in replaced:
+            continue
+        bid = plan.recommended_bid(p)
+        after_deadline = (p.expires_at or far) > plan.deadline
+        if squad_count >= AutoRules.max_squad_size or per_club.get(p.team_id, 0) >= AutoRules.max_per_club:
+            continue
+        if bid > global_remaining or (not after_deadline and bid > remaining):
+            continue
+        result.append(
+            UpgradeProposal(p, bid, forecasts.get(p.id, 0.0), weakest, forecasts.get(weakest.id, 0.0), after_deadline)
+        )
+        replaced.add(weakest.id)
+        squad_count += 1
+        per_club[p.team_id] = per_club.get(p.team_id, 0) + 1
+        global_remaining -= bid
+        if not after_deadline:
+            remaining -= bid
+    return result
+
+
+# ---- sell signal: falling market value ----------------------------------------------
+# Same as TrendSale in AutoTransfer.swift. Players outside the best 11 whose market value
+# has fallen two days in a row and is clearly below its recent peak.
+
+
+class TrendSaleRules:
+    falling_days = 2
+    peak_lookback_days = 14
+    min_drop_pct = 3.0
+
+
+@dataclass
+class TrendSale:
+    player: Player
+    proceeds: float
+    drop_pct: float  # below the peak of the last 14 days
+    peak: float
+    peak_date: datetime
+
+
+def trend_sales(squad: list[Player], history: dict[str, list[MVPoint]], now: datetime) -> list[TrendSale]:
+    by_avg = sorted(squad, key=lambda p: p.average_points, reverse=True)
+    core = {p.id for p in by_avg[: AutoRules.keep_core]}
+    per_position: dict[int, int] = {}
+    for p in squad:
+        per_position[p.position] = per_position.get(p.position, 0) + 1
+    result: list[TrendSale] = []
+    for p in squad:
+        if p.id in core or p.on_market:
+            continue
+        if per_position.get(p.position, 0) <= AutoRules.min_per_position.get(p.position, 0):
+            continue
+        h = history_with_current(history.get(p.id, []), p.market_value, now)
+        n = TrendSaleRules.falling_days
+        if len(h) < n + 2:
+            continue
+        tail = [x.value for x in h[-(n + 1):]]
+        if not all(b < a for a, b in zip(tail, tail[1:])):
+            continue
+        window = h[-TrendSaleRules.peak_lookback_days:]
+        peak = max(window, key=lambda x: x.value)
+        drop = (1 - h[-1].value / peak.value) * 100 if peak.value > 0 else 0.0
+        if drop < TrendSaleRules.min_drop_pct:
+            continue
+        result.append(TrendSale(p, p.market_value * AutoRules.kickbase_sale_factor, drop, peak.value, peak.date))
+        per_position[p.position] -= 1
+    return sorted(result, key=lambda t: t.drop_pct, reverse=True)

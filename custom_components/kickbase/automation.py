@@ -30,6 +30,9 @@ from .const import (
     OPT_CONFIRM_VALID_HOURS,
     OPT_DRY_RUN,
     OPT_INJURY_WARN,
+    OPT_REVIEW,
+    OPT_TREND_SALES,
+    OPT_UPGRADES,
     OPT_LINEUP_LEAD_HOURS,
     OPT_LINEUP_WARN,
     OPT_FULL_AUTO_ACK,
@@ -42,7 +45,8 @@ from .const import (
     opt,
 )
 from .coordinator import KickbaseCoordinator
-from .planner import AutoRules, InjuryAlert, injured_ids, injury_alerts, next_deadline
+from .insights import matchday_review
+from .planner import AutoRules, InjuryAlert, fmt_mio, injured_ids, injury_alerts, next_deadline
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +56,8 @@ ACTION_REJECT = "KICKBASE_REJECT_"
 KIND_BUYS = "kaeufe"
 KIND_SALES = "verkaeufe"
 KIND_INJURY = "verletzung"  # sale of a newly injured player – ALWAYS needs confirmation
+KIND_UPGRADE = "verstaerkung"  # sporting buy (points forecast) – ALWAYS needs confirmation
+KIND_TREND = "abwaertstrend"  # sale of a non-core player with falling value – ALWAYS needs confirmation
 MAX_ERRORS_IN_A_ROW = 2
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
@@ -67,6 +73,7 @@ class OrderItem:
     player_id: str
     name: str
     amount: float  # bid, or expected proceeds for a sale
+    detail: str = ""  # extra line in the notification
 
 
 @dataclass
@@ -112,6 +119,7 @@ class KickbaseAutomation:
         if plan is None:
             return
         if kind == KIND_BUYS:
+            await self._send_upgrades()
             items = [OrderItem(b.player.id, b.player.full_name, b.bid) for b in plan.buys]
             mode = opt(self.options, OPT_MODE_BIDS)
         else:
@@ -131,18 +139,43 @@ class KickbaseAutomation:
         else:
             await self.async_send_order(Order(self._token(), kind, items))
 
+    async def _send_upgrades(self) -> None:
+        """Sporting buys at the buy check times – never automatic, always to confirm."""
+        data = self.coordinator.data
+        if not data or not data.upgrades or not opt(self.options, OPT_UPGRADES):
+            return
+        items = [
+            OrderItem(
+                u.player.id,
+                u.player.full_name,
+                u.bid,
+                f"  {u.player.position_name}, erwartet {u.forecast:.0f} Pkt. statt {u.replaces.full_name} "
+                f"({u.replaces_forecast:.0f}) – +{u.gain:.0f} Pkt. am {data.forecast_matchday}. Spieltag",
+            )
+            for u in data.upgrades
+        ]
+        await self.async_send_order(Order(self._token(), KIND_UPGRADE, items))
+
+    def current_items(self, kind: str) -> list[OrderItem]:
+        """Current proposals of one kind as order items (for the services and the card)."""
+        data = self.coordinator.data
+        plan = data.plan if data else None
+        if plan is None:
+            return []
+        if kind == KIND_BUYS:
+            return [OrderItem(b.player.id, b.player.full_name, b.bid) for b in plan.buys]
+        if kind == KIND_UPGRADE:
+            return [OrderItem(u.player.id, u.player.full_name, u.bid) for u in data.upgrades]
+        if kind == KIND_TREND:
+            return [OrderItem(t.player.id, t.player.full_name, t.proceeds) for t in data.trend_sales]
+        return [OrderItem(s.player.id, s.player.full_name, s.expected_proceeds) for s in plan.sales]
+
     async def async_send_proposals(self, kind: str) -> str | None:
         """Service kickbase.vorschlaege_senden: send the current proposals for confirmation."""
         await self.coordinator.async_refresh()
-        plan = self.coordinator.data.plan if self.coordinator.data else None
-        if plan is None:
-            return None
-        if kind == KIND_BUYS:
-            items = [OrderItem(b.player.id, b.player.full_name, b.bid) for b in plan.buys]
-        else:
-            items = [OrderItem(s.player.id, s.player.full_name, s.expected_proceeds) for s in plan.sales]
+        items = self.current_items(kind)
         if not items:
-            await self._notify("Kickbase", f"Keine {'Kauf' if kind == KIND_BUYS else 'Verkaufs'}vorschläge.")
+            await self._notify("Kickbase", "Keine Vorschläge dieser Art.")
             return None
         order = Order(self._token(), kind, items)
         await self.async_send_order(order)
@@ -266,11 +299,94 @@ class KickbaseAutomation:
         )
 
     @callback
+    def async_check_trend_sales(self) -> None:
+        """Coordinator listener: value of a non-core player keeps falling → sale proposal (once per peak)."""
+        data = self.coordinator.data
+        if not data or not self.enabled or not opt(self.options, OPT_TREND_SALES):
+            return
+        alerted = set(self._state.get("trend_alerted", []))
+        new = [t for t in data.trend_sales if f"{t.player.id}:{t.peak_date.date()}" not in alerted]
+        if not new:
+            return
+        # Keep only keys of current signals (+ the new ones) so the list stays small.
+        current = {f"{t.player.id}:{t.peak_date.date()}" for t in data.trend_sales}
+        self._state["trend_alerted"] = sorted(current)
+        items = [
+            OrderItem(
+                t.player.id,
+                t.player.full_name,
+                t.proceeds,
+                f"  {t.player.position_name}, außerhalb deiner Top 11: seit 2 Tagen fallend, "
+                f"{t.drop_pct:.1f}".replace(".", ",") + f" % unter dem Hoch von {fmt_mio(t.peak)} ({dt_util.as_local(t.peak_date):%d.%m.}).",
+            )
+            for t in new
+        ]
+        order = Order(self._token(), KIND_TREND, items)
+        self.entry.async_create_background_task(
+            self.hass, self._save_and_send(order), f"{DOMAIN}_trend"
+        )
+
+    async def _save_and_send(self, order: Order) -> None:
+        await self._save()
+        await self.async_send_order(order, note="Vor dem nächsten Update um 22:00 Uhr verkaufen sichert den heutigen Wert.")
+
+    @callback
+    def async_check_review(self) -> None:
+        """Coordinator listener: push a short review once a matchday is finished."""
+        data = self.coordinator.data
+        if not data or data.finished_matchday is None or not data.me:
+            return
+        last = self._state.get("reviewed_day")
+        if last is None:
+            self._state["reviewed_day"] = data.finished_matchday  # first run: no review for old matchdays
+            self.entry.async_create_background_task(self.hass, self._save(), f"{DOMAIN}_review_init")
+            return
+        if data.finished_matchday <= last:
+            return
+        self._state["reviewed_day"] = data.finished_matchday
+        self.entry.async_create_background_task(self.hass, self._save(), f"{DOMAIN}_review_save")
+        if not self.enabled or not opt(self.options, OPT_REVIEW):
+            return
+        r = matchday_review(
+            matchday=data.finished_matchday,
+            me=data.me,
+            managers=data.managers,
+            squad=data.squad,
+            forms=data.forms,
+            transfers=self.coordinator.transfers,
+            my_id=data.my_user_id,
+            now=dt_util.utcnow(),
+        )
+        lines = [
+            f"{r.points:.0f} Punkte"
+            + (f" – Platz {r.matchday_placement} am Spieltag" if r.matchday_placement else ""),
+            f"Gesamt Platz {r.placement}, {r.gap_to_first:.0f} Punkte hinter dem Ersten."
+            if r.gap_to_first > 0
+            else f"Gesamt Platz {r.placement} – du führst!",
+        ]
+        if r.best_points > r.points:
+            lines.append(
+                f"Beste mögliche Startelf ({r.best_formation}): {r.best_points:.0f} Punkte "
+                f"(+{r.best_points - r.points:.0f})."
+                + (f" Auf der Bank: {', '.join(r.missed)}." if r.missed else "")
+            )
+        if r.buys:
+            total = sum(g for _, g in r.buys)
+            lines.append(
+                f"Käufe der letzten 7 Tage: {len(r.buys)}, Marktwert seit Kauf {'+' if total >= 0 else ''}{eur(total)}."
+            )
+        self.entry.async_create_background_task(
+            self.hass,
+            self._notify(f"Kickbase: Rückblick {r.matchday}. Spieltag", "\n".join(lines)),
+            f"{DOMAIN}_review",
+        )
+
+    @callback
     def async_check_lineup(self) -> None:
         """Coordinator listener: warn before kick-off if the starting eleven has problems.
 
         Read-only – the lineup is never changed. Each problem is reported once, within
-        `lineup_lead_hours` before the kick-off of the affected player's match.
+        `lineup_lead_hours` before the first kick-off of the matchday (lineup locks then).
         """
         data = self.coordinator.data
         check = data.lineup if data else None
@@ -303,7 +419,8 @@ class KickbaseAutomation:
         first = min(i.deadline for i in new if i.deadline)
         local = dt_util.as_local(first)
         lines.append(
-            f"Anpfiff {WEEKDAYS[local.weekday()]} {local:%H:%M} Uhr – danach ist der Spieler gesperrt."
+            f"Erster Anpfiff {WEEKDAYS[local.weekday()]} {local:%H:%M} Uhr – bis dahin muss die Aufstellung "
+            "stehen, sie gilt dann für den ganzen Spieltag."
         )
         lines.append("Aufstellung bitte in der Kickbase-App ändern.")
         self.entry.async_create_background_task(
@@ -318,11 +435,28 @@ class KickbaseAutomation:
         self._orders[order.token] = order
         total = sum(i.amount for i in order.items)
         valid = opt(self.options, OPT_CONFIRM_VALID_HOURS)
-        if order.kind == KIND_BUYS:
-            title = f"Kickbase: {len(order.items)} Gebot{'e' if len(order.items) != 1 else ''} vorgeschlagen"
-            lines = [f"{i.name}: {eur(i.amount)}" for i in order.items]
+        if order.kind in (KIND_BUYS, KIND_UPGRADE):
+            n = len(order.items)
+            title = (
+                f"Kickbase: {n} Gebot{'e' if n != 1 else ''} vorgeschlagen"
+                if order.kind == KIND_BUYS
+                else f"Kickbase: {n} Verstärkung{'en' if n != 1 else ''} für die Startelf"
+            )
+            lines = []
+            for i in order.items:
+                lines.append(f"{i.name}: {eur(i.amount)}")
+                if i.detail:
+                    lines.append(i.detail)
             lines.append(f"Zusammen {eur(total)}")
             confirm = "Gebote bestätigen"
+        elif order.kind == KIND_TREND:
+            title = "Kickbase: Marktwert fällt – verkaufen?"
+            lines = []
+            for i in order.items:
+                lines.append(f"{i.name}: ca. {eur(i.amount)}")
+                if i.detail:
+                    lines.append(i.detail)
+            confirm = "Verkaufen bestätigen"
         else:
             title = f"Kickbase: {len(order.items)} Verkauf{'e' if len(order.items) != 1 else ''} vorgeschlagen"
             lines = [f"{i.name}: ca. {eur(i.amount)}" for i in order.items]
@@ -448,20 +582,46 @@ class KickbaseAutomation:
                     done_amount += item.amount
                     done_count += 1
                     log.append(f"✓ Gebot {eur(item.amount)} für {item.name}")
-        elif order.kind == KIND_INJURY:
+        elif order.kind == KIND_UPGRADE:
+            current_up = {u.player.id: u for u in data.upgrades}
+            for item in order.items:
+                proposal = current_up.get(item.player_id)
+                if proposal is None:
+                    log.append(f"– {item.name}: nicht mehr vorgeschlagen, übersprungen")
+                    continue
+                if proposal.bid > item.amount:
+                    log.append(f"– {item.name}: Gebot müsste jetzt {eur(proposal.bid)} sein, übersprungen")
+                    continue
+                if dry:
+                    log.append(f"✓ {prefix}{eur(item.amount)} für {item.name} bieten")
+                    continue
+                try:
+                    await api.place_offer(league, item.player_id, int(round(item.amount)))
+                except KickbaseError as err:
+                    errors += 1
+                    log.append(f"✗ {item.name}: {err}")
+                else:
+                    done_amount += item.amount
+                    done_count += 1
+                    log.append(f"✓ Gebot {eur(item.amount)} für {item.name}")
+        elif order.kind in (KIND_INJURY, KIND_TREND):
             squad = {p.id: p for p in data.squad}
             for item in order.items:
                 player = squad.get(item.player_id)
                 if player is None:
                     log.append(f"– {item.name}: nicht mehr im Kader, übersprungen")
                     continue
-                check = injury_alerts(data.squad, set())
-                alert = next((a for a in check if a.player.id == item.player_id), None)
-                if alert is None:
-                    log.append(f"– {item.name}: nicht mehr als verletzt gemeldet, übersprungen")
-                    continue
-                if not alert.sellable:
-                    log.append(f"– {item.name}: {alert.reason}, übersprungen")
+                if order.kind == KIND_INJURY:
+                    check = injury_alerts(data.squad, set())
+                    alert = next((a for a in check if a.player.id == item.player_id), None)
+                    if alert is None:
+                        log.append(f"– {item.name}: nicht mehr als verletzt gemeldet, übersprungen")
+                        continue
+                    if not alert.sellable:
+                        log.append(f"– {item.name}: {alert.reason}, übersprungen")
+                        continue
+                elif not any(t.player.id == item.player_id for t in data.trend_sales):
+                    log.append(f"– {item.name}: Marktwert fällt nicht mehr bzw. Verkauf nicht mehr möglich, übersprungen")
                     continue
                 if dry:
                     log.append(f"✓ {prefix}{item.name} für ca. {eur(player.market_value)} an Kickbase verkaufen")
@@ -501,11 +661,13 @@ class KickbaseAutomation:
                     done_count += 1
                     log.append(f"✓ {item.name} an Kickbase verkauft")
 
-        if not dry and order.kind != KIND_INJURY:  # injury sales do not count against Friday limits
+        if not dry and order.kind in (KIND_BUYS, KIND_UPGRADE):
+            await self._book(KIND_BUYS, done_count, done_amount)
+        elif not dry and order.kind == KIND_SALES:  # single sales do not count against Friday limits
             await self._book(order.kind, done_count, done_amount)
         await self._track_errors(errors, source)
 
-        title = f"Kickbase: {'Gebote' if order.kind == KIND_BUYS else 'Verkäufe'} ({source})"
+        title = f"Kickbase: {'Gebote' if order.kind in (KIND_BUYS, KIND_UPGRADE) else 'Verkäufe'} ({source})"
         if dry:
             title += " – Trockenlauf"
         await self._notify(title, "\n".join(log) or "Nichts zu tun.")

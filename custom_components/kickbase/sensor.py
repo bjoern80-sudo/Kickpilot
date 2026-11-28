@@ -43,9 +43,11 @@ def _squad_attrs(d: KickbaseData) -> dict[str, Any]:
                 "auf_transfermarkt": p.on_market,
                 "verein": p.team_id,
                 "startelf": p.lineup_slot,
+                "prognose": round(d.forecasts[p.id]) if p.id in d.forecasts else None,
             }
             for p in players
         ],
+        "prognose_spieltag": d.forecast_matchday,
         "vereine": {
             tid: d.team_names[tid]
             for tid in sorted({p.team_id for p in (*d.squad, *d.market)})
@@ -127,6 +129,88 @@ def _sale_attrs(d: KickbaseData) -> dict[str, Any]:
             }
             for s in plan.sales
         ],
+    }
+
+
+def _upgrade_attrs(d: KickbaseData) -> dict[str, Any]:
+    return {
+        "spieltag": d.forecast_matchday,
+        "summe": round(sum(u.bid for u in d.upgrades)),
+        "vorschlaege": [
+            {
+                "id": u.player.id,
+                "name": u.player.full_name,
+                "verein": u.player.team_id,
+                "position": u.player.position_name,
+                "marktwert": round(u.player.market_value),
+                "gebot": round(u.bid),
+                "prognose": round(u.forecast),
+                "statt": u.replaces.full_name,
+                "statt_prognose": round(u.replaces_forecast),
+                "plus_punkte": round(u.gain),
+                "endet": _iso(u.player.expires_at),
+                "nach_frist": u.after_deadline,
+            }
+            for u in d.upgrades
+        ],
+    }
+
+
+def _trend_attrs(d: KickbaseData) -> dict[str, Any]:
+    return {
+        "vorschlaege": [
+            {
+                "id": t.player.id,
+                "name": t.player.full_name,
+                "verein": t.player.team_id,
+                "position": t.player.position_name,
+                "erloes": round(t.proceeds),
+                "unter_hoch_pct": round(t.drop_pct, 1),
+                "hoch": round(t.peak),
+                "hoch_am": _iso(t.peak_date),
+            }
+            for t in d.trend_sales
+        ]
+    }
+
+
+def _radar_attrs(d: KickbaseData) -> dict[str, Any]:
+    return {
+        "manager": [
+            {
+                "name": r.manager.name,
+                "ich": r.is_me,
+                "platz": r.manager.placement,
+                "punkte": round(r.manager.season_points),
+                "abstand": round(r.gap_to_first),
+                "abstand_nach_oben": round(r.gap_to_above) if r.gap_to_above is not None else None,
+                "spieltag_punkte": round(r.manager.matchday_points),
+                "spieltag_platz": r.manager.matchday_placement,
+                "teamwert": round(r.manager.team_value),
+                "verletzt_in_startelf": r.injured_starters,
+            }
+            for r in d.radar
+        ]
+    }
+
+
+def _my_gap(d: KickbaseData) -> int | None:
+    me = next((r for r in d.radar if r.is_me), None)
+    return round(me.gap_to_first) if me else None
+
+
+def _capital_attrs(d: KickbaseData) -> dict[str, Any]:
+    c = d.capital
+    if c is None:
+        return {}
+    return {
+        "zuwachs_pro_tag": round(c.daily_growth),
+        "winterpause": _iso(c.winter_break),
+        "kapital_winterpause": round(c.capital_winter) if c.capital_winter is not None else None,
+        "saisonende": _iso(c.season_end),
+        "kapital_saisonende": round(c.capital_end) if c.capital_end is not None else None,
+        "kaufkraft": round(c.buying_power),
+        "kaufkraft_winterpause": round(c.buying_power_winter) if c.buying_power_winter is not None else None,
     }
 
 
@@ -213,6 +297,35 @@ SENSORS: tuple[KickbaseSensorDescription, ...] = (
             "punkte": round(d.me.season_points) if d.me else None,
             "manager": len(d.managers),
         },
+    ),
+    KickbaseSensorDescription(
+        key="upgrade_proposals",
+        translation_key="upgrade_proposals",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda d: len(d.upgrades),
+        attrs_fn=_upgrade_attrs,
+    ),
+    KickbaseSensorDescription(
+        key="trend_sales",
+        translation_key="trend_sales",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda d: len(d.trend_sales),
+        attrs_fn=_trend_attrs,
+    ),
+    KickbaseSensorDescription(
+        key="league_gap",
+        translation_key="league_gap",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="Pkt.",
+        value_fn=_my_gap,
+        attrs_fn=_radar_attrs,
+    ),
+    KickbaseSensorDescription(
+        key="capital",
+        translation_key="capital",
+        value_fn=lambda d: d.capital.capital if d.capital else None,
+        attrs_fn=_capital_attrs,
+        **EURO,
     ),
     KickbaseSensorDescription(
         key="squad_size",

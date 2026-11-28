@@ -12,6 +12,8 @@ struct AutoTransferView: View {
     @State private var log: [String] = []
     @State private var detailPlayer: Player? = nil
     @State private var withdrawPlayer: Player? = nil
+    @State private var confirmUpgrade: UpgradeProposal? = nil
+    @State private var confirmTrend: TrendSale? = nil
 
     private var plan: AutoPlan? { state.autoPlan }
 
@@ -24,6 +26,8 @@ struct AutoTransferView: View {
                     openBidSection(plan)
                     buySection(plan)
                     saleSection(plan)
+                    upgradeSection
+                    trendSection
                     profileSection
                 } else if state.autoLoading {
                     ProgressView(state.autoStatus).frame(maxWidth: .infinity)
@@ -259,6 +263,94 @@ struct AutoTransferView: View {
     }
 
     /// Live budget for the current selection; unchecked players show what keeping them costs.
+    // MARK: Upgrades (points forecast) and sell signals
+
+    private var upgradeSection: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
+                if state.upgrades.isEmpty {
+                    Text("Kein Marktspieler mit heutigem Ablauf bringt laut Prognose mindestens \(Int(ForecastRules.upgradeMinGain)) Punkte mehr als dein schwächster Starter.")
+                        .font(.callout).foregroundColor(.secondary)
+                }
+                ForEach(state.upgrades) { u in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("\(u.player.fullName) (\(u.player.positionName))").fontWeight(.semibold)
+                            Text("Prognose \(Int(u.forecast.rounded())) statt \(u.replaces.fullName) (\(Int(u.replacesForecast.rounded()))) · +\(Int(u.gain.rounded())) Pkt.")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Text(Fmt.eur(u.bid)).monospacedDigit()
+                        Button("Bieten …") { confirmUpgrade = u }.disabled(executing)
+                    }
+                }
+                Text("Prognose: ½ Saison-Ø + ½ Ø der letzten 4 Spieltage × Einsatzquote, Gegner (±20 %), Heim/Auswärts (±5 %).")
+                    .font(.caption2).foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text("Verstärkungen für die Startelf\(state.forecastMatchday.map { " · \($0). Spieltag" } ?? "")").font(.headline)
+        }
+        .confirmationDialog(
+            "\(Fmt.eur(confirmUpgrade?.bid ?? 0)) auf \(confirmUpgrade?.player.fullName ?? "") bieten?",
+            isPresented: Binding(get: { confirmUpgrade != nil }, set: { if !$0 { confirmUpgrade = nil } }),
+            presenting: confirmUpgrade
+        ) { u in
+            Button("Verbindlich bieten", role: .destructive) {
+                run {
+                    let err = await state.placeOffer(u.player, price: Int(u.bid.rounded()))
+                    return [err.map { "✗ \(u.player.fullName): \($0)" } ?? "✓ Gebot \(Fmt.eur(u.bid)) für \(u.player.fullName)"]
+                }
+            }
+            Button("Abbrechen", role: .cancel) {}
+        } message: { _ in
+            Text("Das ist eine echte Transaktion in deiner Kickbase-Liga.")
+        }
+    }
+
+    private func trendText(_ t: TrendSale) -> String {
+        let pct = String(format: "%.1f", t.dropPct).replacingOccurrences(of: ".", with: ",")
+        return "\(pct) % unter dem Hoch (\(Fmt.eur(t.peak))) – seit 2 Tagen fallend"
+    }
+
+    private var trendSection: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
+                if state.trendSales.isEmpty {
+                    Text("Kein Spieler außerhalb deiner Top 11 verliert gerade deutlich an Wert.")
+                        .font(.callout).foregroundColor(.secondary)
+                }
+                ForEach(state.trendSales) { t in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("\(t.player.fullName) (\(t.player.positionName))").fontWeight(.semibold)
+                            Text(trendText(t))
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Text(Fmt.eur(t.proceeds)).monospacedDigit()
+                        Button("Verkaufen …") { confirmTrend = t }.disabled(executing)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text("Verkaufssignale (fallender Marktwert)").font(.headline)
+        }
+        .confirmationDialog(
+            "\(confirmTrend?.player.fullName ?? "") an Kickbase verkaufen?",
+            isPresented: Binding(get: { confirmTrend != nil }, set: { if !$0 { confirmTrend = nil } }),
+            presenting: confirmTrend
+        ) { t in
+            Button("Für ca. \(Fmt.eur(t.proceeds)) verkaufen", role: .destructive) {
+                run { await state.executeSales([SaleProposal(player: t.player, expectedProceeds: t.proceeds, gainPct: 0, gainBasis: "")]) }
+            }
+            Button("Abbrechen", role: .cancel) {}
+        } message: { _ in
+            Text("Der Spieler wird sofort an Kickbase verkauft – das ist nicht rückgängig zu machen.")
+        }
+    }
+
     @ViewBuilder
     private func saleImpact(_ plan: AutoPlan) -> some View {
         let withSelection = plan.committedBudget + chosenSales.reduce(0) { $0 + $1.expectedProceeds }

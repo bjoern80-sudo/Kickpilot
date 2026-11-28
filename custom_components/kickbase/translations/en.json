@@ -56,6 +56,9 @@
           "lineup_warn": "Warn before kick-off",
           "lineup_lead_hours": "Lineup warning lead time",
           "injury_warn": "Warn on injury",
+          "upgrade_proposals": "Propose upgrade buys",
+          "trend_sales": "Sell signal on falling value",
+          "matchday_review": "Review after each matchday",
           "design": "Dashboard design"
         },
         "data_description": {
@@ -73,9 +76,12 @@
           "max_sales_per_friday": "Full automation only.",
           "confirm_valid_hours": "After this, a tap on Confirm is rejected.",
           "dry_run": "Only log, never execute.",
-          "lineup_warn": "Send a notification before kick-off if a starter is injured or suspended, his club does not play or slots are empty. The lineup is never changed.",
-          "lineup_lead_hours": "Warn this many hours before the kick-off of the affected player's match.",
+          "lineup_warn": "Send a notification before the first kick-off of the matchday if a starter is injured or suspended, his club does not play or slots are empty. The lineup is never changed.",
+          "lineup_lead_hours": "Warn this many hours before the first kick-off of the matchday.",
           "injury_warn": "When one of your players is reported injured, a notification with a sale proposal is sent right away (before the 22:00 market value update). The sale only happens after you confirm, even in full automation.",
+          "upgrade_proposals": "At the check times, propose bids on market players whose points forecast clearly beats your weakest starter of the same position. Always to confirm.",
+          "trend_sales": "Propose selling players outside your top 11 whose value has fallen for 2 days and is at least 3 % below the 14-day high. Always to confirm.",
+          "matchday_review": "After the last match of a matchday: points, placement, gap, best possible lineup and result of your buys.",
           "design": "Look of the Kickpilot card (custom:kickpilot-card)."
         }
       }
@@ -96,7 +102,9 @@
     "art": {
       "options": {
         "kaeufe": "Buys (bids)",
-        "verkaeufe": "Sales"
+        "verkaeufe": "Sales",
+        "verstaerkung": "Upgrades (points forecast)",
+        "abwaertstrend": "Sales on falling value"
       }
     },
     "design": {
@@ -143,6 +151,18 @@
       },
       "data_status": {
         "name": "Transfer and market value data"
+      },
+      "upgrade_proposals": {
+        "name": "Upgrade proposals"
+      },
+      "trend_sales": {
+        "name": "Sell signals"
+      },
+      "league_gap": {
+        "name": "Gap to leader"
+      },
+      "capital": {
+        "name": "Capital"
       }
     },
     "binary_sensor": {

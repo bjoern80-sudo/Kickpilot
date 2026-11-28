@@ -2,8 +2,8 @@
 
 1:1 port of `LineupCheck.swift` in the macOS app – change rules in BOTH files.
 
-Kickbase locks each player individually when his club's match starts, so only players
-whose match has not started yet are checked. Problems (trigger a warning):
+The lineup has to be set before the FIRST kick-off of a matchday (usually Friday 20:30) and then
+counts for the whole matchday (league rule, confirmed by the user). Problems (trigger a warning):
 * starting eleven incomplete (< 11 players)
 * starter not fit (injured, stricken, suspended, …)
 * starter's club has no match on this matchday
@@ -23,7 +23,7 @@ class LineupRules:
     starting_size = 11
     # Bench player must average at least this many points more than the starter (tip).
     tip_min_avg_gain = 20.0
-    # Default: warn this many hours before the next kick-off.
+    # Default: warn this many hours before the first kick-off of the matchday.
     default_lead_hours = 2.0
 
 
@@ -82,7 +82,7 @@ class LineupIssue:
     text: str
     player: Player | None = None
     replacement: Player | None = None
-    # Last moment the issue can be fixed (kick-off of the player's match, or the next one).
+    # Last moment the issue can be fixed: first kick-off of the matchday.
     deadline: datetime | None = None
 
     @property
@@ -99,9 +99,10 @@ class LineupIssue:
 @dataclass
 class LineupCheck:
     matchday: int | None = None
-    next_kickoff: datetime | None = None
+    # First kick-off of the matchday = the lineup is locked from then on (None: already locked).
+    lock_at: datetime | None = None
+    locked: bool = False
     starters: int = 0
-    open_players: int = 0  # starters whose match has not started yet
     issues: list[LineupIssue] = field(default_factory=list)
 
     @property
@@ -130,23 +131,17 @@ def check_lineup(squad: list[Player], matchday: Matchday | None, now: datetime) 
     if matchday is None:
         return result
     result.matchday = matchday.day
-    upcoming = [m.kickoff for m in matchday.matches if not m.started and m.kickoff > now]
-    result.next_kickoff = min(upcoming, default=None)
-
-    def match_of(p: Player) -> Match | None:
-        return matchday.kickoff_of(p.team_id)
-
-    def is_open(p: Player) -> bool:
-        """Still changeable: own match exists and has not started."""
-        m = match_of(p)
-        return m is not None and not m.started and m.kickoff > now
-
+    first = min((m.kickoff for m in matchday.matches), default=None)
     starters = [p for p in squad if p.lineup_slot is not None]
     bench = [p for p in squad if p.lineup_slot is None]
     result.starters = len(starters)
-    result.open_players = sum(1 for p in starters if is_open(p))
-    if result.next_kickoff is None:
-        return result  # everything has started – nothing can be changed any more
+    if first is None or first <= now or any(m.started for m in matchday.matches):
+        result.locked = True  # matchday running – lineup counts as set
+        return result
+    result.lock_at = first
+
+    def plays(p: Player) -> bool:
+        return matchday.kickoff_of(p.team_id) is not None
 
     used: set[str] = set()
 
@@ -154,7 +149,7 @@ def check_lineup(squad: list[Player], matchday: Matchday | None, now: datetime) 
         candidates = [
             b
             for b in bench
-            if b.position == position and b.is_fit and is_open(b) and b.id not in used
+            if b.position == position and b.is_fit and plays(b) and b.id not in used
             and (better_than is None or b.average_points >= better_than)
         ]
         best = max(candidates, key=lambda b: b.average_points, default=None)
@@ -162,40 +157,37 @@ def check_lineup(squad: list[Player], matchday: Matchday | None, now: datetime) 
             used.add(best.id)
         return best
 
-    missing = LineupRules.starting_size - len(starters)
-    if missing > 0:
+    if len(starters) < LineupRules.starting_size:
         result.issues.append(
             LineupIssue(
                 "unvollstaendig",
                 f"Startelf unvollständig: {len(starters)} von {LineupRules.starting_size} Plätzen besetzt",
-                deadline=result.next_kickoff,
+                deadline=first,
             )
         )
 
     # Weakest first, so the best replacement goes to the most urgent slot.
-    for p in sorted(starters, key=lambda p: p.average_points):
-        m = match_of(p)
-        if m is None:
-            sub = best_bench(p.position)
+    by_avg = sorted(starters, key=lambda p: p.average_points)
+    for p in by_avg:
+        if not plays(p):
             result.issues.append(
                 LineupIssue(
                     "kein_spiel",
                     f"{_name(p)}: Verein hat an diesem Spieltag kein Spiel",
                     p,
-                    sub,
-                    deadline=result.next_kickoff,
+                    best_bench(p.position),
+                    deadline=first,
                 )
             )
-        elif not is_open(p):
-            continue  # match already started – locked
         elif not p.is_fit:
-            sub = best_bench(p.position)
             result.issues.append(
-                LineupIssue("nicht_fit", f"{_name(p)} ist {status_text(p.status)}", p, sub, deadline=m.kickoff)
+                LineupIssue(
+                    "nicht_fit", f"{_name(p)} ist {status_text(p.status)}", p, best_bench(p.position), deadline=first
+                )
             )
 
-    for p in sorted(starters, key=lambda p: p.average_points):
-        if not (is_open(p) and p.is_fit):
+    for p in by_avg:
+        if not (plays(p) and p.is_fit):
             continue
         sub = best_bench(p.position, better_than=p.average_points + LineupRules.tip_min_avg_gain)
         if sub is not None:
@@ -205,8 +197,7 @@ def check_lineup(squad: list[Player], matchday: Matchday | None, now: datetime) 
                     f"{sub.full_name} (Ø {sub.average_points:.0f}) statt {p.full_name} (Ø {p.average_points:.0f})",
                     p,
                     sub,
-                    deadline=min(match_of(p).kickoff, match_of(sub).kickoff),
+                    deadline=first,
                 )
             )
     return result
-

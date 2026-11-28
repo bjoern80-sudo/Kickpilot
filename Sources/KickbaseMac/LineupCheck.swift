@@ -3,8 +3,8 @@ import Foundation
 // Lineup guard: checks the starting eleven before kick-off (read-only, never changes the lineup).
 // 1:1 port in `custom_components/kickbase/lineup.py` – change rules in BOTH files.
 //
-// Kickbase locks each player individually when his club's match starts, so only players
-// whose match has not started yet are checked. Problems: starting eleven incomplete,
+// The lineup has to be set before the FIRST kick-off of a matchday (usually Friday 20:30) and
+// then counts for the whole matchday (league rule). Problems: starting eleven incomplete,
 // starter not fit, starter's club has no match. Tips: a fit bench player of the same
 // position averages clearly more points.
 
@@ -12,7 +12,7 @@ enum LineupRules {
     static let startingSize = 11
     /// Bench player must average at least this many points more than the starter (tip).
     static let tipMinAvgGain = 20.0
-    /// Warn (sidebar badge) this many hours before the affected kick-off.
+    /// Warn this many hours before the first kick-off of the matchday.
     static let leadHours = 2.0
 }
 
@@ -47,7 +47,7 @@ struct LineupIssue: Identifiable, Hashable {
     let text: String
     var player: Player? = nil
     var replacement: Player? = nil
-    /// Last moment the issue can be fixed (kick-off of the player's match, or the next one).
+    /// Last moment the issue can be fixed: first kick-off of the matchday.
     var deadline: Date? = nil
 
     var isProblem: Bool { kind != .tip }
@@ -56,10 +56,10 @@ struct LineupIssue: Identifiable, Hashable {
 
 struct LineupCheck {
     var matchday: Int?
-    var nextKickoff: Date?
+    /// First kick-off of the matchday = the lineup is locked from then on (nil: already locked).
+    var lockAt: Date?
+    var locked = false
     var starters = 0
-    /// Starters whose match has not started yet.
-    var openPlayers = 0
     var issues: [LineupIssue] = []
 
     var problems: [LineupIssue] { issues.filter(\.isProblem) }
@@ -77,24 +77,22 @@ struct LineupCheck {
         var result = LineupCheck()
         guard let matchday else { return result }
         result.matchday = matchday.day
-        result.nextKickoff = matchday.matches.filter { !$0.started && $0.kickoff > now }.map(\.kickoff).min()
-
-        func isOpen(_ p: Player) -> Bool {
-            guard let m = matchday.match(of: p.teamId) else { return false }
-            return !m.started && m.kickoff > now
-        }
-
+        let first = matchday.matches.map(\.kickoff).min()
         let starters = squad.filter { $0.lineupSlot != nil }
         let bench = squad.filter { $0.lineupSlot == nil }
         result.starters = starters.count
-        result.openPlayers = starters.filter(isOpen).count
-        guard result.nextKickoff != nil else { return result } // everything has started
+        guard let first, first > now, !matchday.matches.contains(where: \.started) else {
+            result.locked = true // matchday running – lineup counts as set
+            return result
+        }
+        result.lockAt = first
 
+        func plays(_ p: Player) -> Bool { matchday.match(of: p.teamId) != nil }
         var used = Set<String>()
         func bestBench(_ position: Int, betterThan: Double? = nil) -> Player? {
             let best = bench
                 .filter { b in
-                    b.position == position && b.isFit && isOpen(b) && !used.contains(b.id)
+                    b.position == position && b.isFit && plays(b) && !used.contains(b.id)
                         && (betterThan.map { b.averagePoints >= $0 } ?? true)
                 }
                 .max { $0.averagePoints < $1.averagePoints }
@@ -107,37 +105,32 @@ struct LineupCheck {
             result.issues.append(.init(
                 kind: .incomplete,
                 text: "Startelf unvollständig: \(starters.count) von \(LineupRules.startingSize) Plätzen besetzt",
-                deadline: result.nextKickoff
+                deadline: first
             ))
         }
 
         // Weakest first, so the best replacement goes to the most urgent slot.
         let byAvg = starters.sorted { $0.averagePoints < $1.averagePoints }
         for p in byAvg {
-            guard let m = matchday.match(of: p.teamId) else {
+            if !plays(p) {
                 result.issues.append(.init(
                     kind: .noMatch, text: "\(name(p)): Verein hat an diesem Spieltag kein Spiel",
-                    player: p, replacement: bestBench(p.position), deadline: result.nextKickoff
+                    player: p, replacement: bestBench(p.position), deadline: first
                 ))
-                continue
-            }
-            guard isOpen(p) else { continue } // match already started – locked
-            if !p.isFit {
+            } else if !p.isFit {
                 result.issues.append(.init(
                     kind: .notFit, text: "\(name(p)) ist \(p.statusText)",
-                    player: p, replacement: bestBench(p.position), deadline: m.kickoff
+                    player: p, replacement: bestBench(p.position), deadline: first
                 ))
             }
         }
 
-        for p in byAvg where isOpen(p) && p.isFit {
-            guard let sub = bestBench(p.position, betterThan: p.averagePoints + LineupRules.tipMinAvgGain),
-                  let pm = matchday.match(of: p.teamId), let sm = matchday.match(of: sub.teamId)
-            else { continue }
+        for p in byAvg where plays(p) && p.isFit {
+            guard let sub = bestBench(p.position, betterThan: p.averagePoints + LineupRules.tipMinAvgGain) else { continue }
             result.issues.append(.init(
                 kind: .tip,
                 text: "\(sub.fullName) (Ø \(Int(sub.averagePoints.rounded()))) statt \(p.fullName) (Ø \(Int(p.averagePoints.rounded())))",
-                player: p, replacement: sub, deadline: min(pm.kickoff, sm.kickoff)
+                player: p, replacement: sub, deadline: first
             ))
         }
         return result

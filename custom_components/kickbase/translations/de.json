@@ -56,6 +56,9 @@
           "lineup_warn": "Warnung vor dem Anpfiff",
           "lineup_lead_hours": "Vorlauf der Aufstellungs-Warnung",
           "injury_warn": "Warnung bei Verletzung",
+          "upgrade_proposals": "Verstärkungs-Käufe vorschlagen",
+          "trend_sales": "Verkaufssignal bei fallendem Marktwert",
+          "matchday_review": "Rückblick nach jedem Spieltag",
           "design": "Design des Dashboards"
         },
         "data_description": {
@@ -73,9 +76,12 @@
           "max_sales_per_friday": "Gilt nur für die Vollautomatik.",
           "confirm_valid_hours": "Danach wird ein Tipp auf „Bestätigen“ abgelehnt.",
           "dry_run": "Nur protokollieren, nichts ausführen. Erst ausschalten, wenn alles geprüft ist.",
-          "lineup_warn": "Vor dem Anpfiff eine Nachricht schicken, wenn ein Spieler der Startelf verletzt oder gesperrt ist, sein Verein nicht spielt oder Plätze leer sind. Die Aufstellung wird nie geändert.",
-          "lineup_lead_hours": "So viele Stunden vor dem Anpfiff des betroffenen Spielers wird gewarnt.",
+          "lineup_warn": "Vor dem ersten Anpfiff des Spieltags eine Nachricht schicken, wenn ein Spieler der Startelf verletzt oder gesperrt ist, sein Verein nicht spielt oder Plätze leer sind. Die Aufstellung wird nie geändert.",
+          "lineup_lead_hours": "So viele Stunden vor dem ersten Anpfiff des Spieltags wird gewarnt.",
           "injury_warn": "Wird ein eigener Spieler als verletzt gemeldet, kommt sofort eine Nachricht mit Verkaufsvorschlag (vor dem Marktwert-Update um 22:00). Verkauft wird nur nach deiner Bestätigung, auch in der Vollautomatik.",
+          "upgrade_proposals": "Zu den Prüfzeiten Gebote auf Marktspieler vorschlagen, die laut Punkteprognose deutlich mehr bringen als dein schwächster Starter derselben Position. Immer mit Bestätigung.",
+          "trend_sales": "Spieler außerhalb deiner Top 11, deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem 14-Tage-Hoch liegt, zum Verkauf vorschlagen. Immer mit Bestätigung.",
+          "matchday_review": "Nach dem letzten Spiel eines Spieltags: Punkte, Platz, Abstand, beste mögliche Startelf und Bilanz der Käufe.",
           "design": "Aussehen der Kickpilot-Karte (custom:kickpilot-card)."
         }
       }
@@ -96,7 +102,9 @@
     "art": {
       "options": {
         "kaeufe": "Käufe (Gebote)",
-        "verkaeufe": "Verkäufe"
+        "verkaeufe": "Verkäufe",
+        "verstaerkung": "Verstärkungen (Punkteprognose)",
+        "abwaertstrend": "Verkäufe bei fallendem Marktwert"
       }
     },
     "design": {
@@ -143,6 +151,18 @@
       },
       "data_status": {
         "name": "Datenstand Transfers und Marktwerte"
+      },
+      "upgrade_proposals": {
+        "name": "Verstärkungen"
+      },
+      "trend_sales": {
+        "name": "Verkaufssignale"
+      },
+      "league_gap": {
+        "name": "Abstand zum Ersten"
+      },
+      "capital": {
+        "name": "Kapital"
       }
     },
     "binary_sensor": {

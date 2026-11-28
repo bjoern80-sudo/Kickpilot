@@ -45,6 +45,9 @@ from .const import (
     OPT_FRIDAY_TIMES,
     OPT_FULL_AUTO_ACK,
     OPT_INJURY_WARN,
+    OPT_REVIEW,
+    OPT_TREND_SALES,
+    OPT_UPGRADES,
     OPT_LINEUP_LEAD_HOURS,
     OPT_LINEUP_WARN,
     OPT_MAX_BID_SUM_PER_DAY,
@@ -254,6 +257,9 @@ class KickbaseOptionsFlow(OptionsFlow):
                 vol.Required(OPT_LINEUP_WARN): BooleanSelector(),
                 vol.Required(OPT_LINEUP_LEAD_HOURS): _number(1, 24, 1, "h"),
                 vol.Required(OPT_INJURY_WARN): BooleanSelector(),
+                vol.Required(OPT_UPGRADES): BooleanSelector(),
+                vol.Required(OPT_TREND_SALES): BooleanSelector(),
+                vol.Required(OPT_REVIEW): BooleanSelector(),
                 vol.Required(OPT_DESIGN): SelectSelector(
                     SelectSelectorConfig(
                         options=[DESIGN_APP, DESIGN_HA],

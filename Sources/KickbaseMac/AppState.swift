@@ -22,6 +22,12 @@ final class AppState: ObservableObject {
     @Published var squad: [Player] = [] { didSet { updateInjuries() } }
     /// Own players newly reported injured – shown in the team view until sold or dismissed.
     @Published var injuryAlerts: [InjuryAlert] = []
+    /// Points forecast for the next matchday (player id → points), sporting buys and sell signals.
+    @Published var forecasts: [String: Double] = [:]
+    @Published var forecastMatchday: Int?
+    @Published var upgrades: [UpgradeProposal] = []
+    @Published var trendSales: [TrendSale] = []
+    private var marketForms: [String: (PlayerForm, Date)] = [:]
     @Published var market: [Player] = []
     @Published var managers: [Manager] = []
     @Published var teams: [String: Team] = [:]
@@ -428,6 +434,46 @@ final class AppState: ObservableObject {
             history: mvHistory,
             openBidPlayerIds: openBids
         )
+        autoStatus = "Berechne Punkteprognose …"
+        await buildForecasts()
+        if let plan = autoPlan {
+            upgrades = UpgradeProposal.proposals(plan: plan, squad: squad, market: market, myUserId: myUserId,
+                                                 forecasts: forecasts)
+        }
+        trendSales = TrendSale.signals(squad: squad, history: mvHistory)
+    }
+
+    /// Expected points for the next matchday that has not started (own squad + market).
+    private func buildForecasts() async {
+        guard let api, let league = currentLeague else { return }
+        if matchdays.isEmpty, let days = try? await api.matchdays(competitionId: league.competitionId) { matchdays = days }
+        let now = Date()
+        guard let upcoming = matchdays.sorted(by: { $0.day < $1.day })
+            .first(where: { d in !d.matches.isEmpty && d.matches.allSatisfy { $0.status == 0 && $0.kickoff > now } })
+        else { forecasts = [:]; forecastMatchday = nil; return }
+        let forms = (try? await api.lineupForms(league: league.id)) ?? [:]
+        let missing = market.map(\.id).filter { id in
+            marketForms[id].map { now.timeIntervalSince($0.1) > 6 * 3600 } ?? true
+        }
+        await withTaskGroup(of: (String, PlayerForm?).self) { group in
+            for id in missing {
+                group.addTask { (id, try? await api.playerForm(league: league.id, playerId: id)) }
+            }
+            for await (id, form) in group { if let form { marketForms[id] = (form, now) } }
+        }
+        let place = teams.compactMapValues { $0.placement > 0 ? $0.placement : nil }
+        func fixture(_ teamId: String) -> Fixture? {
+            guard let m = upcoming.match(of: teamId) else { return nil }
+            let home = m.homeId == teamId
+            return Fixture(opponentId: home ? m.awayId : m.homeId, home: home)
+        }
+        var out: [String: Double] = [:]
+        for p in squad { out[p.id] = PointsForecast.points(p, form: forms[p.id], fixture: fixture(p.teamId), tablePlace: place) }
+        for p in market {
+            out[p.id] = PointsForecast.points(p, form: marketForms[p.id]?.0, fixture: fixture(p.teamId), tablePlace: place)
+        }
+        forecasts = out
+        forecastMatchday = upcoming.day
     }
 
     /// REAL transactions: places the given bids one after another. Returns a log.

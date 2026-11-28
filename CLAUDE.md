@@ -41,6 +41,11 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   `t1`/`t2` Vereins-IDs, `t1sy`/`t2sy` Kürzel, `st` 0 offen / 2 beendet). Kickbase sperrt jeden Spieler einzeln
   beim Anpfiff seines Spiels. `/lineup` hat zusätzlich `lst` (1 Spiel offen, 4 vorbei – vermutet), `ph` = letzte
   5 Spieltage (`hp` gespielt, `p` Punkte); `mdst`, `ht` noch unklar.
+- Rangliste `/ranking` → `us[]`: `sp` Saisonpunkte, `spl` Platz, `mdp`/`mdpl` Spieltagspunkte/-platz, `tv` Teamwert,
+  `lp` = Spieler-IDs der aktuellen Startelf des Managers.
+- Marktliste hat KEIN `ap` – Ø-Punkte und `ph` nur über `/players/{id}` (HA cached 6 h). `ph[0]` = aktueller
+  Spieltag (geprüft: eigene `mdp` = Summe der `ph[0]` der Startelf).
+- Tabelle: `cp` = Punkte, `cpl` = Platz (Swift nutzte früher fälschlich `cp`).
 - Vereinsnamen: `/v4/competitions/1/table` → `it[]` mit `tid`, `tn` (Kurzname, z. B. „M'gladbach“).
   Die Karte ordnet `tn` Kürzel + Vereinsfarben zu (`CLUBS` in `kickpilot-card.js`, keine Logos – Urheberrecht).
 - Antwortformate sind nicht offiziell dokumentiert: bei neuen Endpunkten erst eine
@@ -82,11 +87,12 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
 - Freitags-Ausgleich: schwächste Spieler (Ø-Punkte) mit bestem Wertzuwachs zuerst, Top 11 zuletzt.
 
 ## Aufstellungs-Wächter (`LineupCheck.swift`, `lineup.py` – 1:1, Regeln in BEIDEN ändern)
-- Nur Hinweise, ändert die Aufstellung nie. Geprüft werden nur Spieler, deren Spiel noch nicht begonnen hat.
+- Nur Hinweise, ändert die Aufstellung nie. Ligaregel (Nutzer, 28.11.2026): Die Aufstellung muss vor dem ERSTEN
+  Anpfiff des Spieltags stehen (meist Fr 20:30) und gilt dann für den ganzen Spieltag → danach `locked`.
 - Probleme: Startelf < 11, Starter nicht fit (`st` ≠ 0), Verein ohne Spiel am Spieltag. Ersatz = fitter
   Bankspieler gleicher Position mit bestem Ø. Tipp: Bankspieler gleicher Position mit ≥ 20 Ø-Punkten mehr.
-- HA: Binärsensor `lineup_problem`, Push einmal je Problem im Vorlauf (Option, Standard 2 h) vor dem Anpfiff
-  des betroffenen Spielers (nur bei „Automatik aktiv“); Spielplan wird alle 3 h geladen.
+- HA: Binärsensor `lineup_problem`, Push einmal je Problem im Vorlauf (Option, Standard 2 h) vor dem ersten
+  Anpfiff (nur bei „Automatik aktiv“); Spielplan wird alle 3 h geladen.
   Mac-App: Hinweis in der Team-Ansicht + Badge in der Seitenleiste.
 
 ## Verletzungs-Warnung (`InjuryAlert` in `AutoTransfer.swift`, `injury_alerts` in `planner.py` – 1:1)
@@ -95,6 +101,17 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
 - Verkaufsvorschlag (100 % MW an Kickbase), Hinweis auf das MW-Update um 22:00. Nicht verkaufbar, wenn die
   Mindestbesetzung (`minPerPosition`) unterschritten würde. Verkauf IMMER nur nach Bestätigung (Push-Button
   bzw. Dialog), auch bei Vollautomatik; zählt nicht zum Freitags-Verkaufslimit. Option `injury_warn`.
+
+## Punkteprognose, Verstärkungen, Verkaufssignale (`planner.py` ↔ `AutoTransfer.swift`, 1:1)
+- Prognose = (½ `ap` + ½ Ø der gespielten der letzten 4 abgeschlossenen Spieltage) × Einsatzquote × Gegner
+  (Platz 1 −20 % … Platz 18 +20 %) × Heim 1,05 / Auswärts 0,95; angeschlagen ×0,5, sonst nicht fit = 0.
+- Verstärkung: Marktspieler (Ablauf heute, fit) mit Prognose ≥ schwächster Starter gleicher Position + 20;
+  Gebot = `recommended_bid`, gleiche Budget-/Kader-/Vereinsregeln. IMMER mit Bestätigung (Art `verstaerkung`).
+- Verkaufssignal: außerhalb Top 11, MW 2 Tage in Folge gefallen, ≥ 3 % unter 14-Tage-Hoch, Mindestbesetzung.
+  Einmal je Spieler + Hochdatum, IMMER mit Bestätigung (Art `abwaertstrend`), zählt nicht zum Freitagslimit.
+- Nur HA (`insights.py`): Konkurrenz-Radar, Kapitalplan (Zuwachs = Kaderwert-Änderung 14 Tage / 14,
+  Winterpause = Lücke > 14 Tage zwischen Spieltagen), Spieltags-Rückblick (beste Startelf aus `ph[0]` über die
+  Kickbase-Formationen, einmal je beendetem Spieltag, Store-Key `reviewed_day`).
 
 ## Home-Assistant-Integration (`custom_components/kickbase/`)
 - Python-Port für Home Assistant, Plan in `docs/home-assistant-plan.md`.

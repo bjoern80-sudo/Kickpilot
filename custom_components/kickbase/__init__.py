@@ -20,7 +20,7 @@ from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .api import KickbaseApi
-from .automation import KIND_BUYS, KIND_SALES, KickbaseAutomation, Order, OrderItem
+from .automation import KIND_BUYS, KIND_SALES, KIND_TREND, KIND_UPGRADE, KickbaseAutomation, Order
 from .const import DOMAIN
 from .coordinator import KickbaseCoordinator
 
@@ -30,7 +30,7 @@ SERVICE_REFRESH_PLAN = "plan_aktualisieren"
 SERVICE_SEND = "vorschlaege_senden"
 SERVICE_EXECUTE = "vorschlaege_ausfuehren"
 
-KIND = vol.In([KIND_BUYS, KIND_SALES])
+KIND = vol.In([KIND_BUYS, KIND_SALES, KIND_UPGRADE, KIND_TREND])
 
 type KickbaseConfigEntry = ConfigEntry[KickbaseCoordinator]
 
@@ -68,6 +68,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: KickbaseConfigEntry) -> 
     entry.async_on_unload(coordinator.async_add_listener(automation.async_check_deadline))
     entry.async_on_unload(coordinator.async_add_listener(automation.async_check_lineup))
     entry.async_on_unload(coordinator.async_add_listener(automation.async_check_injuries))
+    entry.async_on_unload(coordinator.async_add_listener(automation.async_check_trend_sales))
+    entry.async_on_unload(coordinator.async_add_listener(automation.async_check_review))
     entry.async_on_unload(
         hass.bus.async_listen("mobile_app_notification_action", automation.async_handle_action)
     )
@@ -115,13 +117,7 @@ def _register_services(hass: HomeAssistant) -> None:
                 if token in a._orders:  # noqa: SLF001
                     logs += await a.async_confirm(token, "Aktion")
                 continue
-            plan = a.coordinator.data.plan if a.coordinator.data else None
-            if plan is None:
-                continue
-            if kind == KIND_BUYS:
-                items = [OrderItem(b.player.id, b.player.full_name, b.bid) for b in plan.buys]
-            else:
-                items = [OrderItem(s.player.id, s.player.full_name, s.expected_proceeds) for s in plan.sales]
+            items = a.current_items(kind)
             if items:
                 logs += await a.async_execute(Order(a._token(), kind, items), source="Aktion")  # noqa: SLF001
         if token and not logs:

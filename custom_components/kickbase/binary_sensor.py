@@ -46,7 +46,7 @@ def _issue(i: LineupIssue) -> dict[str, Any]:
 
 
 class LineupProblemSensor(KickbaseEntity, BinarySensorEntity):
-    """On while the starting eleven has a problem that can still be fixed."""
+    """On while the starting eleven has a problem – until the first kick-off of the matchday."""
 
     _attr_translation_key = "lineup_problem"
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
@@ -71,9 +71,9 @@ class LineupProblemSensor(KickbaseEntity, BinarySensorEntity):
             return {}
         return {
             "spieltag": c.matchday,
-            "naechster_anpfiff": c.next_kickoff.isoformat() if c.next_kickoff else None,
+            "aufstellung_bis": c.lock_at.isoformat() if c.lock_at else None,
+            "gesperrt": c.locked,
             "startelf": c.starters,
-            "noch_aenderbar": c.open_players,
             "probleme": [_issue(i) for i in c.problems],
             "tipps": [_issue(i) for i in c.tips],
         }

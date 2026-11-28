@@ -55,15 +55,44 @@ class Manager:
     placement: int
     season_points: float
     team_value: float
+    matchday_points: float = 0.0  # `mdp`: current / last matchday
+    matchday_placement: int | None = None  # `mdpl`
+    lineup_ids: tuple[str, ...] = ()  # `lp`: player ids of the current starting eleven
 
     @classmethod
     def from_json(cls, j: dict) -> Manager:
+        lp = j.get("lp")
         return cls(
             id=text(j.get("i")) or "",
             name=text(j.get("n")) or "?",
             placement=int(num(j.get("spl")) or 999),
             season_points=num(j.get("sp")) or 0.0,
             team_value=num(j.get("tv")) or 0.0,
+            matchday_points=num(j.get("mdp")) or 0.0,
+            matchday_placement=int(v) if (v := num(j.get("mdpl"))) is not None else None,
+            lineup_ids=tuple(t for x in lp if (t := text(x))) if isinstance(lp, list) else (),
+        )
+
+
+@dataclass(frozen=True)
+class PlayerForm:
+    """Points history of a player: `ap` and `ph` (last 5 matchdays, NEWEST first;
+    `hp` false = not played / not yet played). From /players/{id} or /lineup."""
+
+    player_id: str
+    average_points: float
+    recent: tuple[float | None, ...]  # newest first, None = not played
+
+    @classmethod
+    def from_json(cls, j: dict, player_id: str | None = None) -> PlayerForm:
+        ph = j.get("ph") if isinstance(j.get("ph"), list) else []
+        recent = tuple(
+            (num(x.get("p")) or 0.0) if x.get("hp") else None for x in ph if isinstance(x, dict)
+        )
+        return cls(
+            player_id=player_id or text(j.get("i")) or "",
+            average_points=num(j.get("ap")) or 0.0,
+            recent=recent,
         )
 
 

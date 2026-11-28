@@ -9,6 +9,8 @@ vorschlaege_senden:
           options:
             - kaeufe
             - verkaeufe
+            - verstaerkung
+            - abwaertstrend
           translation_key: art
 
 vorschlaege_ausfuehren:
@@ -25,4 +27,6 @@ vorschlaege_ausfuehren:
           options:
             - kaeufe
             - verkaeufe
+            - verstaerkung
+            - abwaertstrend
           translation_key: art

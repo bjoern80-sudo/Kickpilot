@@ -96,16 +96,16 @@ struct LineupBanner: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                if check.nextKickoff == nil {
-                    Label("Spieltag \(check.matchday ?? 0) läuft – alle Spiele angepfiffen", systemImage: "lock.fill")
+                if check.lockAt == nil {
+                    Label("Spieltag \(check.matchday ?? 0) läuft – Aufstellung gesperrt", systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                 } else if check.problems.isEmpty {
                     Label("Aufstellung ok", systemImage: "checkmark.circle.fill").foregroundColor(.green)
                 } else {
                     Label("Aufstellung prüfen", systemImage: "exclamationmark.triangle.fill").foregroundColor(.red)
                 }
-                if let next = check.nextKickoff {
-                    Text("· Spieltag \(check.matchday ?? 0), nächster Anpfiff \(Fmt.kickoff(next))")
+                if let lock = check.lockAt {
+                    Text("· Spieltag \(check.matchday ?? 0), muss stehen bis \(Fmt.deadline(lock))")
                         .foregroundColor(.secondary)
                 }
                 Spacer()
@@ -131,7 +131,7 @@ struct LineupBanner: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 8).fill(
-            (check.problems.isEmpty ? Color.green : Color.red).opacity(check.nextKickoff == nil ? 0.04 : 0.08)
+            (check.problems.isEmpty ? Color.green : Color.red).opacity(check.lockAt == nil ? 0.04 : 0.08)
         ))
     }
 
@@ -167,6 +167,10 @@ struct LeagueView: View {
                         .fontWeight(m.id == state.myUserId ? .bold : .regular)
                 }
                 TableColumn("Punkte") { m in Text(Fmt.int(m.seasonPoints)).monospacedDigit() }
+                TableColumn("Abstand") { m in
+                    let gap = (state.managers.map(\.seasonPoints).max() ?? m.seasonPoints) - m.seasonPoints
+                    Text(gap > 0 ? "−\(Fmt.int(gap))" : "Spitze").monospacedDigit()
+                }
                 TableColumn("Letzter Spieltag") { m in Text(Fmt.int(m.matchDayPoints)).monospacedDigit() }
                 TableColumn("Teamwert") { m in Text(Fmt.eur(m.teamValue)).monospacedDigit() }
             }
