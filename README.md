@@ -21,7 +21,8 @@
 Kickpilot verbindet dein [Kickbase](https://www.kickbase.com)-Konto mit Home Assistant. Die Integration
 lädt regelmäßig Budget, Kader, Transfermarkt und Ligatabelle. Daraus berechnet sie, welche Spieler sich
 gerade zum Kaufen lohnen und wen du vor der Freitagsfrist verkaufen solltest. Die Vorschläge kommen als
-Nachricht aufs Handy. Ausgeführt wird erst, wenn du auf **Bestätigen** tippst.
+Nachricht aufs Handy. Ausgeführt wird erst, wenn du auf **Bestätigen** tippst. Vor jedem Anpfiff warnt
+Kickpilot außerdem, wenn in deiner Startelf ein verletzter oder gesperrter Spieler steht.
 
 Dazu gibt es die **Kickpilot-Karte** fürs Dashboard: Kennzahlen, Vorschläge, offene Gebote, deine
 Startelf auf dem Spielfeld und die Ersatzbank.
@@ -51,6 +52,7 @@ Startelf auf dem Spielfeld und die Ersatzbank.
 |---|---|
 | **Überblick** | Sensoren für Budget, Teamwert, Budget nach offenen Geboten, Minus-Grenze, Gebotsrahmen bis Freitag, Platz in der Liga und Kadergröße. HA speichert den Verlauf, damit siehst du Budget und Teamwert über Wochen. |
 | **Kaufvorschläge** | Zu festen Prüfzeiten sucht Kickpilot Spieler auf dem Transfermarkt, deren Marktwert voraussichtlich steigt, und schlägt ein passendes Gebot vor. |
+| **Aufstellungs-Wächter** | Vor jedem Anpfiff prüft Kickpilot deine Startelf: alle 11 Plätze besetzt, alle fit, Verein spielt an diesem Spieltag. Bei einem Problem kommt eine Push-Nachricht mit dem besten fitten Ersatz von der Bank (Standard: 2 Stunden vor dem Spiel des Spielers). Tipps zeigen Bankspieler, die im Schnitt deutlich mehr Punkte holen. Die Aufstellung änderst du selbst in der Kickbase-App. |
 | **Freitags-Ausgleich** | Ist dein Budget vor Freitag 20:30 Uhr im Minus, schlägt Kickpilot Verkäufe vor. Schwache Spieler mit gutem Wertzuwachs gehen zuerst, deine Top 11 zuletzt. |
 | **Push-Nachrichten** | Vorschläge, Warnungen und Ergebnisse gehen an die Benachrichtigungsziele, die du auswählst, z. B. die Companion-App auf dem iPhone. Bestätigen und Ablehnen geht direkt aus der Nachricht. |
 | **Halb- oder vollautomatisch** | Standard ist halbautomatisch: nichts passiert ohne deine Bestätigung. Die Vollautomatik musst du ausdrücklich einschalten, und sie hat Grenzen pro Prüfung und Tag. |
@@ -145,6 +147,8 @@ Alles lässt sich später unter **Einstellungen → Geräte & Dienste → Kickba
 | Höchstens Verkäufe pro Freitag | 3 | Nur Vollautomatik |
 | Gültigkeit einer Bestätigung | 2 h | Ältere Bestätigungen werden abgelehnt |
 | Trockenlauf | an | Nur protokollieren, nichts ausführen |
+| Warnung vor dem Anpfiff | an | Push-Nachricht, wenn die Startelf ein Problem hat |
+| Vorlauf der Aufstellungs-Warnung | 2 h | So lange vor dem Anpfiff des betroffenen Spielers wird gewarnt |
 | Design des Dashboards | App-Design | Aussehen der Kickpilot-Karte |
 
 **Notbremse:** Der Schalter **Automatik aktiv** stoppt alle geplanten Prüfungen und Nachrichten.
@@ -166,7 +170,7 @@ type: custom:kickpilot-card
 | `device_id` | Nur nötig, wenn du mehrere Ligen eingerichtet hast |
 
 Die Karte zeigt Kennzahlen, Kauf- und Verkaufsvorschläge, offene Gebote, den Stand der Automatik, deine
-Startelf auf dem Spielfeld und die Ersatzbank. Die ⓘ-Zeichen erklären die einzelnen Werte.
+Startelf auf dem Spielfeld mit dem Ergebnis des Aufstellungs-Wächters und die Ersatzbank. Die ⓘ-Zeichen erklären die einzelnen Werte.
 Gebote und Verkäufe aus der Karte heraus fragen immer erst nach.
 
 ## Entitäten, Aktionen und Events
@@ -174,7 +178,7 @@ Gebote und Verkäufe aus der Karte heraus fragen immer erst nach.
 **Sensoren:** Budget · Teamwert · Budget nach Geboten · Offene Gebote · Minus-Grenze · Gebotsrahmen bis
 Freitag · Nächste Frist · Platz · Kader · Kaufvorschläge · Verkaufsvorschläge · Datenstand Transfers und Marktwerte
 
-**Weitere:** Binärsensor *Ausgleich nötig* · Schalter *Automatik aktiv* · Auswahl *Betriebsart Gebote* und
+**Weitere:** Binärsensoren *Ausgleich nötig* und *Aufstellung prüfen* (Probleme, Tipps und nächster Anpfiff als Attribute) · Schalter *Automatik aktiv* · Auswahl *Betriebsart Gebote* und
 *Betriebsart Verkäufe*
 
 Die Vorschlags-Sensoren enthalten die Details (Spieler, Gebot, erwarteter Gewinn, Ablauf) als Attribute.

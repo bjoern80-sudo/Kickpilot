@@ -167,6 +167,24 @@ actor KickbaseAPI {
         return out
     }
 
+    /// Season schedule: `it[]` = matchdays with `day` and `it[]` = matches
+    /// (`mi`, `dt` kick-off, `t1`/`t2` club ids, `st` 0 not started / 2 finished).
+    func matchdays(competitionId: String) async throws -> [Matchday] {
+        let j = try await getObject("/v4/competitions/\(competitionId)/matchdays")
+        return J.arr(j["it"]).compactMap { d in
+            let day = J.int(d["day"]) ?? 0
+            let matches = J.arr(d["it"]).compactMap { m -> Match? in
+                guard let kickoff = Self.parseDate(J.str(m["dt"])) else { return nil }
+                return Match(
+                    id: J.str(m["mi"]) ?? UUID().uuidString, matchday: J.int(m["day"]) ?? day,
+                    kickoff: kickoff, homeId: J.str(m["t1"]) ?? "", awayId: J.str(m["t2"]) ?? "",
+                    status: J.int(m["st"]) ?? 0
+                )
+            }
+            return day > 0 && !matches.isEmpty ? Matchday(day: day, matches: matches) : nil
+        }
+    }
+
     /// Only timeframe 365 returns data. Entries: {dt: days since epoch, mv}.
     func marketValueHistory(league: String, playerId: String) async throws -> [MVPoint] {
         let j = try await getObject("/v4/leagues/\(league)/players/\(playerId)/marketvalue/365")

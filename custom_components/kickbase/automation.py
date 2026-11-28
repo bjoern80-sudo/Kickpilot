@@ -29,6 +29,8 @@ from .const import (
     MODE_SEMI,
     OPT_CONFIRM_VALID_HOURS,
     OPT_DRY_RUN,
+    OPT_LINEUP_LEAD_HOURS,
+    OPT_LINEUP_WARN,
     OPT_FULL_AUTO_ACK,
     OPT_MAX_BID_SUM_PER_DAY,
     OPT_MAX_BIDS_PER_RUN,
@@ -49,6 +51,7 @@ ACTION_REJECT = "KICKBASE_REJECT_"
 KIND_BUYS = "kaeufe"
 KIND_SALES = "verkaeufe"
 MAX_ERRORS_IN_A_ROW = 2
+WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
 
 def eur(value: float) -> str:
@@ -84,6 +87,7 @@ class KickbaseAutomation:
         self._store: Store = Store(hass, 1, f"{DOMAIN}_automation_{entry.entry_id}")
         self._state: dict[str, Any] = {}
         self._alerted_deadline: str | None = None
+        self._alerted_lineup: set[str] = set()
 
     @property
     def options(self) -> dict:
@@ -195,6 +199,53 @@ class KickbaseAutomation:
             self.entry.async_create_background_task(
                 self.hass, self._notify("Kickbase: Ausgleich nötig", text), f"{DOMAIN}_deadline"
             )
+
+    @callback
+    def async_check_lineup(self) -> None:
+        """Coordinator listener: warn before kick-off if the starting eleven has problems.
+
+        Read-only – the lineup is never changed. Each problem is reported once, within
+        `lineup_lead_hours` before the kick-off of the affected player's match.
+        """
+        data = self.coordinator.data
+        check = data.lineup if data else None
+        if not self.enabled or not opt(self.options, OPT_LINEUP_WARN) or check is None:
+            return
+        now = dt_util.utcnow()
+        due = check.due(now, float(opt(self.options, OPT_LINEUP_LEAD_HOURS)))
+        new = [i for i in due if i.is_problem and i.key not in self._alerted_lineup]
+        if not new:
+            return
+        self._alerted_lineup |= {i.key for i in due}
+        # Forget old keys (deadlines in the past) so the set does not grow forever.
+        self._alerted_lineup = {
+            k for k in self._alerted_lineup
+            if any(i.key == k for i in check.issues)
+        }
+        lines = []
+        for i in new:
+            line = i.text
+            if i.kind != "unvollstaendig":
+                line += (
+                    f" → Ersatz: {i.replacement.full_name} (Ø {i.replacement.average_points:.0f})"
+                    if i.replacement
+                    else " → kein fitter Ersatz auf dieser Position"
+                )
+            lines.append(line)
+        tips = [i for i in due if not i.is_problem]
+        if tips:
+            lines.append("Tipp: " + "; ".join(t.text for t in tips))
+        first = min(i.deadline for i in new if i.deadline)
+        local = dt_util.as_local(first)
+        lines.append(
+            f"Anpfiff {WEEKDAYS[local.weekday()]} {local:%H:%M} Uhr – danach ist der Spieler gesperrt."
+        )
+        lines.append("Aufstellung bitte in der Kickbase-App ändern.")
+        self.entry.async_create_background_task(
+            self.hass,
+            self._notify(f"Kickbase: Aufstellung prüfen (Spieltag {check.matchday})", "\n".join(lines)),
+            f"{DOMAIN}_lineup",
+        )
 
     # ---- notifications ---------------------------------------------------------
 

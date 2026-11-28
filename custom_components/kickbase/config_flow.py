@@ -44,6 +44,8 @@ from .const import (
     OPT_DRY_RUN,
     OPT_FRIDAY_TIMES,
     OPT_FULL_AUTO_ACK,
+    OPT_LINEUP_LEAD_HOURS,
+    OPT_LINEUP_WARN,
     OPT_MAX_BID_SUM_PER_DAY,
     OPT_MAX_BIDS_PER_RUN,
     OPT_MAX_SALES_PER_FRIDAY,
@@ -213,6 +215,7 @@ class KickbaseOptionsFlow(OptionsFlow):
                     OPT_MAX_BIDS_PER_RUN,
                     OPT_MAX_BID_SUM_PER_DAY,
                     OPT_MAX_SALES_PER_FRIDAY,
+                    OPT_LINEUP_LEAD_HOURS,
                 ):
                     user_input[key] = int(user_input[key])
                 return self.async_create_entry(data={**DEFAULT_OPTIONS, **user_input})
@@ -247,6 +250,8 @@ class KickbaseOptionsFlow(OptionsFlow):
                 vol.Required(OPT_MAX_SALES_PER_FRIDAY): _number(1, 10, 1),
                 vol.Required(OPT_CONFIRM_VALID_HOURS): _number(1, 24, 1, "h"),
                 vol.Required(OPT_DRY_RUN): BooleanSelector(),
+                vol.Required(OPT_LINEUP_WARN): BooleanSelector(),
+                vol.Required(OPT_LINEUP_LEAD_HOURS): _number(1, 24, 1, "h"),
                 vol.Required(OPT_DESIGN): SelectSelector(
                     SelectSelectorConfig(
                         options=[DESIGN_APP, DESIGN_HA],

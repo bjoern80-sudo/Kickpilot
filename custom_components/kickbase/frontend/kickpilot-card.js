@@ -20,6 +20,7 @@ const KEYS = {
   squad_size: ["sensor", "_kader"],
   data_status: ["sensor", "_datenstand_transfers_und_marktwerte"],
   balance_needed: ["binary_sensor", "_ausgleich_notig"],
+  lineup_problem: ["binary_sensor", "_aufstellung_prufen"],
   automation: ["switch", "_automatik_aktiv"],
   mode_bids: ["select", "_betriebsart_gebote"],
   mode_sales: ["select", "_betriebsart_verkaufe"],
@@ -91,6 +92,13 @@ const INFO = {
     "sieht schon die neuen Werte. Gebot = Marktwert + üblicher Aufpreis des stärksten Konkurrenten + 1 Prozentpunkt.\n\n" +
     "Halbautomatisch: Vorschläge kommen aufs Handy, geboten wird erst nach deiner Bestätigung.\n" +
     "Vollautomatisch: Gebote werden ohne Rückfrage abgegeben, begrenzt durch Anzahl und Tagessumme aus den Einstellungen.",
+  lineup:
+    "Kickpilot prüft deine Startelf vor jedem Anpfiff: Sind alle 11 Plätze besetzt, sind alle Spieler fit und hat ihr " +
+    "Verein an diesem Spieltag ein Spiel? Kickbase sperrt jeden Spieler, sobald sein Spiel angepfiffen ist – geprüft " +
+    "werden nur Spieler, die du noch tauschen kannst. Als Ersatz schlägt Kickpilot den fitten Bankspieler derselben " +
+    "Position mit dem besten Ø vor. Tipps zeigen Bankspieler, die im Schnitt mindestens 20 Punkte mehr holen.\n\n" +
+    "Die Warnung kommt per Push vor dem Anpfiff (Vorlauf in den Einstellungen). Ändern musst du die Aufstellung " +
+    "selbst in der Kickbase-App.",
   mode_sales:
     "Freitags zu den eingestellten Zeiten prüft Kickpilot, ob dein Budget nach offenen Geboten zur Frist " +
     "(20:30 Uhr) im Minus wäre. Dann schlägt es Verkäufe an Kickbase (100 % des Marktwerts) vor: zuerst die " +
@@ -268,6 +276,14 @@ button ha-icon { --mdc-icon-size:18px; }
 .root.ha .toast { background:var(--card-background-color, #fff); border:var(--kp-border); }
 .toast.err { border-left:4px solid var(--kp-red); }
 .warn { margin-bottom:12px; }
+.lu { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+.lu .row { display:flex; gap:8px; align-items:flex-start; font-size:13px; line-height:1.45; border-radius:10px; padding:8px 10px; }
+.lu .row ha-icon { --mdc-icon-size:18px; flex:none; margin-top:1px; }
+.lu .row.red { background:color-mix(in srgb, var(--kp-red) 14%, transparent); }
+.lu .row.red ha-icon { color:var(--kp-red); }
+.lu .row.amber { background:color-mix(in srgb, var(--kp-amber) 14%, transparent); }
+.lu .row.amber ha-icon { color:var(--kp-amber); }
+.lu .row .sub2 { color:var(--kp-mut); font-size:12px; }
 `;
 
 class KickpilotCard extends HTMLElement {
@@ -751,8 +767,37 @@ class KickpilotCard extends HTMLElement {
     return `<div class="card s7">
       <div class="head"><div class="h"><ha-icon icon="mdi:soccer-field"></ha-icon>Startelf</div>
         <span class="sub">${xi.length ? `${formation} · ${xi.length} / 11` : ""}</span></div>
+      ${this._lineupCheck()}
       ${pitch}
     </div>`;
+  }
+
+  // Aufstellungs-Wächter: nur Hinweise, die Aufstellung wird nie geändert.
+  _lineupCheck() {
+    const st = this._st("lineup_problem");
+    if (!st || st.state === "unavailable") return "";
+    const a = st.attributes || {};
+    const problems = a.probleme || [];
+    const tips = a.tipps || [];
+    const next = a.naechster_anpfiff;
+    const until = (i) => (i.bis ? ` · bis ${esc(shortDate(i.bis))} Uhr` : "");
+    const rows = [
+      ...problems.map((i) => {
+        const sub = i.art === "unvollstaendig" ? "" : i.ersatz
+          ? `Ersatz: ${esc(i.ersatz)} (Ø ${NUM.format(i.ersatz_schnitt)})`
+          : "Kein fitter Ersatz auf dieser Position";
+        return `<div class="row red"><ha-icon icon="mdi:alert"></ha-icon><div>${esc(i.text)}
+          <div class="sub2">${sub}${until(i)}</div></div></div>`;
+      }),
+      ...tips.map((i) => `<div class="row amber"><ha-icon icon="mdi:swap-horizontal"></ha-icon><div>Tipp: ${esc(i.text)}
+          <div class="sub2">Stärker auf der Bank${until(i)}</div></div></div>`),
+    ];
+    const status = !next
+      ? `<span class="pill"><ha-icon icon="mdi:lock"></ha-icon>Spieltag ${a.spieltag ?? ""} läuft – alle Spiele angepfiffen</span>`
+      : problems.length
+        ? `<span class="pill red"><ha-icon icon="mdi:alert"></ha-icon>Aufstellung prüfen · nächster Anpfiff ${esc(shortDate(next))} Uhr</span>`
+        : `<span class="pill green"><ha-icon icon="mdi:check"></ha-icon>Aufstellung ok · nächster Anpfiff ${esc(shortDate(next))} Uhr</span>`;
+    return `<div class="lu"><div class="pills">${status}${this._info_icon("lineup")}</div>${rows.join("")}</div>`;
   }
 
   _bench() {

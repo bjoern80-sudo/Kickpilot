@@ -53,6 +53,8 @@
           "max_sales_per_friday": "Höchstens Verkäufe pro Freitag",
           "confirm_valid_hours": "Gültigkeit einer Bestätigung",
           "dry_run": "Trockenlauf",
+          "lineup_warn": "Warnung vor dem Anpfiff",
+          "lineup_lead_hours": "Vorlauf der Aufstellungs-Warnung",
           "design": "Design des Dashboards"
         },
         "data_description": {
@@ -70,6 +72,8 @@
           "max_sales_per_friday": "Gilt nur für die Vollautomatik.",
           "confirm_valid_hours": "Danach wird ein Tipp auf „Bestätigen“ abgelehnt.",
           "dry_run": "Nur protokollieren, nichts ausführen. Erst ausschalten, wenn alles geprüft ist.",
+          "lineup_warn": "Vor dem Anpfiff eine Nachricht schicken, wenn ein Spieler der Startelf verletzt oder gesperrt ist, sein Verein nicht spielt oder Plätze leer sind. Die Aufstellung wird nie geändert.",
+          "lineup_lead_hours": "So viele Stunden vor dem Anpfiff des betroffenen Spielers wird gewarnt.",
           "design": "Aussehen der Kickpilot-Karte (custom:kickpilot-card)."
         }
       }
@@ -142,6 +146,9 @@
     "binary_sensor": {
       "balance_needed": {
         "name": "Ausgleich nötig"
+      },
+      "lineup_problem": {
+        "name": "Aufstellung prüfen"
       }
     },
     "switch": {

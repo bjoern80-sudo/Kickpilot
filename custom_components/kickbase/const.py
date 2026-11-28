@@ -23,6 +23,8 @@ OPT_MAX_BID_SUM_PER_DAY = "max_bid_sum_per_day"
 OPT_MAX_SALES_PER_FRIDAY = "max_sales_per_friday"
 OPT_DRY_RUN = "dry_run"
 OPT_DESIGN = "design"  # DESIGN_APP | DESIGN_HA (look of the Kickpilot card)
+OPT_LINEUP_WARN = "lineup_warn"  # warn before kick-off if the starting eleven has problems
+OPT_LINEUP_LEAD_HOURS = "lineup_lead_hours"
 
 MODE_SEMI = "semi"
 MODE_FULL = "full"
@@ -46,6 +48,8 @@ DEFAULT_OPTIONS: dict = {
     OPT_MAX_SALES_PER_FRIDAY: 3,
     OPT_DRY_RUN: True,
     OPT_DESIGN: DESIGN_APP,
+    OPT_LINEUP_WARN: True,
+    OPT_LINEUP_LEAD_HOURS: 2,
 }
 
 MIN_SCAN_INTERVAL = 5
@@ -53,11 +57,7 @@ MAX_SCAN_INTERVAL = 120
 
 TIMEZONE = "Europe/Berlin"
 
-# League rules (same as AutoRules in the macOS app)
-DEADLINE_WEEKDAY = 4  # Python: Monday = 0 … Friday = 4
-DEADLINE_HOUR = 19
-FREE_WINDOW_HOUR = 20
-MAX_DEBT_SHARE_OF_TEAM_VALUE = 0.30
+# League rules: see AutoRules in planner.py (same as AutoTransfer.swift in the macOS app).
 
 
 def opt(options: dict, key: str):

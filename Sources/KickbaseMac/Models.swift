@@ -57,6 +57,8 @@ struct Player: Identifiable, Hashable, Sendable {
     let myOfferPrice: Double?
     /// Squad only: market value gain since purchase (`mvgl`).
     let gainSincePurchase: Double?
+    /// Own squad only (`lo`): 0–10 = slot in the starting eleven, nil = bench.
+    let lineupSlot: Int?
 
     init(json p: JSONObject, fetchedAt: Date = Date()) {
         // Other managers' squads (/managers/{uid}/squad) use `pi`/`pn` instead of `i`/`n`.
@@ -92,6 +94,7 @@ struct Player: Identifiable, Hashable, Sendable {
         onMarket = J.bool(p["iotm"])
         myOfferPrice = J.dbl(p["uop"]).flatMap { $0 > 0 ? $0 : nil }
         gainSincePurchase = J.dbl(p["mvgl"])
+        lineupSlot = J.int(p["lo"])
     }
 
     var fullName: String {

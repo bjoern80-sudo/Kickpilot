@@ -12,6 +12,7 @@ from typing import Any
 
 import aiohttp
 
+from .lineup import Match, Matchday
 from .models import League, Manager, ManagerTransferEntry, MVPoint, Player, num, text
 
 _LOGGER = logging.getLogger(__name__)
@@ -156,6 +157,32 @@ class KickbaseApi:
             if isinstance(row, dict) and (tid := text(row.get("tid"))):
                 out[tid] = text(row.get("tn")) or tid
         return out
+
+    async def matchdays(self, competition_id: str = "1") -> list[Matchday]:
+        """Season schedule: `it[]` = matchdays with `day` and `it[]` = matches
+        (`mi`, `dt` kick-off, `t1`/`t2` club ids, `st` 0 not started / 2 finished)."""
+        j = await self._get(f"/v4/competitions/{competition_id}/matchdays")
+        days: list[Matchday] = []
+        for d in _arr(j.get("it")):
+            day = int(num(d.get("day")) or 0)
+            matches = []
+            for m in _arr(d.get("it")):
+                kickoff = _parse_date(text(m.get("dt")))
+                if kickoff is None:
+                    continue
+                matches.append(
+                    Match(
+                        match_id=text(m.get("mi")) or "",
+                        matchday=int(num(m.get("day")) or day),
+                        kickoff=kickoff,
+                        home_id=text(m.get("t1")) or "",
+                        away_id=text(m.get("t2")) or "",
+                        status=int(num(m.get("st")) or 0),
+                    )
+                )
+            if day and matches:
+                days.append(Matchday(day, matches))
+        return days
 
     async def manager_transfers(
         self, league: str, user_id: str, start: int

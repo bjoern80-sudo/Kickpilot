@@ -59,6 +59,15 @@ enum Fmt {
         return (signed && v > 0 ? "+" : "") + s + " %"
     }
 
+    /// "Sa 15:30 Uhr" in German time (kick-off within the current week).
+    static func kickoff(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "de_DE")
+        f.timeZone = TimeZone(identifier: "Europe/Berlin")
+        f.dateFormat = "EE HH:mm 'Uhr'"
+        return f.string(from: d).replacingOccurrences(of: ".", with: "")
+    }
+
     /// "Fr 28.11. 20:30 Uhr" in German time.
     static func deadline(_ d: Date) -> String {
         let f = DateFormatter()

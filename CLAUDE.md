@@ -37,6 +37,10 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   Punkte `tp` (statt `p`), dazu `mv`, `tfhmvt`, `pos`, `st`, `ap`, `oui` (Besitzer).
 - Aufstellung: eigener Kader `/squad` hat `lo` (0–10 = Startelf-Platz, fehlt = Bank); Formation = Anzahl je
   Position. `/lineup` liefert dasselbe plus `os` = Kürzel des NÄCHSTEN GEGNERS (nicht des eigenen Vereins!).
+- Spielplan: `/v4/competitions/1/matchdays` → `it[]` Spieltage (`day`, `it[]` Spiele mit `mi`, `dt` Anpfiff UTC,
+  `t1`/`t2` Vereins-IDs, `t1sy`/`t2sy` Kürzel, `st` 0 offen / 2 beendet). Kickbase sperrt jeden Spieler einzeln
+  beim Anpfiff seines Spiels. `/lineup` hat zusätzlich `lst` (1 Spiel offen, 4 vorbei – vermutet), `ph` = letzte
+  5 Spieltage (`hp` gespielt, `p` Punkte); `mdst`, `ht` noch unklar.
 - Vereinsnamen: `/v4/competitions/1/table` → `it[]` mit `tid`, `tn` (Kurzname, z. B. „M'gladbach“).
   Die Karte ordnet `tn` Kürzel + Vereinsfarben zu (`CLUBS` in `kickpilot-card.js`, keine Logos – Urheberrecht).
 - Antwortformate sind nicht offiziell dokumentiert: bei neuen Endpunkten erst eine
@@ -76,6 +80,14 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   sicherer, ob der Marktwert wie geschätzt steigt.
 - Verkauf an Kickbase bringt immer 100 % des Marktwerts (vom Nutzer bestätigt).
 - Freitags-Ausgleich: schwächste Spieler (Ø-Punkte) mit bestem Wertzuwachs zuerst, Top 11 zuletzt.
+
+## Aufstellungs-Wächter (`LineupCheck.swift`, `lineup.py` – 1:1, Regeln in BEIDEN ändern)
+- Nur Hinweise, ändert die Aufstellung nie. Geprüft werden nur Spieler, deren Spiel noch nicht begonnen hat.
+- Probleme: Startelf < 11, Starter nicht fit (`st` ≠ 0), Verein ohne Spiel am Spieltag. Ersatz = fitter
+  Bankspieler gleicher Position mit bestem Ø. Tipp: Bankspieler gleicher Position mit ≥ 20 Ø-Punkten mehr.
+- HA: Binärsensor `lineup_problem`, Push einmal je Problem im Vorlauf (Option, Standard 2 h) vor dem Anpfiff
+  des betroffenen Spielers (nur bei „Automatik aktiv“); Spielplan wird alle 3 h geladen.
+  Mac-App: Hinweis in der Team-Ansicht + Badge in der Seitenleiste.
 
 ## Home-Assistant-Integration (`custom_components/kickbase/`)
 - Python-Port für Home Assistant, Plan in `docs/home-assistant-plan.md`.

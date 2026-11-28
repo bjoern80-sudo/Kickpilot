@@ -92,11 +92,19 @@ struct MainView: View {
     @State private var selection: SidebarItem? = .team
     @State private var analysisManagerId: String? = nil
 
+    private func badge(for item: SidebarItem) -> Text? {
+        switch item {
+        case .auto where state.deadlineAlert: return Text("!")
+        case .team where !(state.lineupCheck?.problems.isEmpty ?? true): return Text("!")
+        default: return nil
+        }
+    }
+
     var body: some View {
         NavigationSplitView {
             List(SidebarItem.allCases, selection: $selection) { item in
                 Label(item.rawValue, systemImage: item.icon)
-                    .badge(item == .auto && state.deadlineAlert ? "!" : nil)
+                    .badge(badge(for: item))
                     .tag(item)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)

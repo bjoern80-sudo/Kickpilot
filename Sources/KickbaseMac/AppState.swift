@@ -23,6 +23,8 @@ final class AppState: ObservableObject {
     @Published var market: [Player] = []
     @Published var managers: [Manager] = []
     @Published var teams: [String: Team] = [:]
+    /// Season schedule (kick-off times) for the lineup guard.
+    @Published var matchdays: [Matchday] = []
     @Published var managerSquads: [String: [Player]] = [:]
     @Published var lastUpdate: Date?
 
@@ -115,6 +117,11 @@ final class AppState: ObservableObject {
         resetTransfers()
     }
 
+    /// Lineup guard for the current matchday (read-only hints, never changes the lineup).
+    var lineupCheck: LineupCheck? {
+        matchdays.isEmpty ? nil : LineupCheck.check(squad: squad, matchday: Matchday.current(matchdays))
+    }
+
     // MARK: - Loading
 
     func refreshAll() async {
@@ -130,11 +137,13 @@ final class AppState: ObservableObject {
             async let m = api.market(league: league.id)
             async let r = api.ranking(league: league.id)
             async let t = api.competitionTable(competitionId: league.competitionId)
+            async let md = api.matchdays(competitionId: league.competitionId)
             budget = try await b
             squad = try await s
             market = try await m
             managers = try await r
             if let table = try? await t { teams = table }
+            if let days = try? await md { matchdays = days }
             managerSquads = [:]
             lastUpdate = Date()
         } catch {

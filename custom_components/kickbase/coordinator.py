@@ -4,6 +4,7 @@
 * Once a day at `mv_fetch_time` (and on first start): transfers of all managers and
   market value histories, cached in .storage so a restart does not reload everything.
 * At `check_times` / Friday `friday_times`: event `kickbase_vorschlaege`.
+* Season schedule (kick-off times) every few hours → lineup check before kick-off.
 Nothing here executes transactions.
 """
 
@@ -36,6 +37,7 @@ from .const import (
     opt,
     parse_times,
 )
+from .lineup import LineupCheck, Matchday, check_lineup, current_matchday
 from .models import Manager, ManagerTransferEntry, MVPoint, Player, Transfer
 from .planner import (
     AutoPlan,
@@ -54,6 +56,7 @@ TRANSFER_PAGE_SIZE = 25
 PARALLEL = 4
 HISTORY_KEEP_DAYS = 200
 HISTORY_MAX_AGE = timedelta(hours=26)
+SCHEDULE_MAX_AGE = timedelta(hours=3)
 STORE_VERSION = 1
 
 
@@ -70,6 +73,7 @@ class KickbaseData:
     history_loaded_at: datetime | None = None
     transfer_count: int = 0
     team_names: dict[str, str] = field(default_factory=dict)
+    lineup: LineupCheck | None = None
 
     @property
     def team_value(self) -> float:
@@ -100,6 +104,8 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
         self._transfers: list[Transfer] = []
         self._history: dict[str, list[MVPoint]] = {}
         self._team_names: dict[str, str] = {}
+        self._matchdays: list[Matchday] = []
+        self._matchdays_at: datetime | None = None
         self._history_loaded_at: datetime | None = None
         self._history_lock = asyncio.Lock()
         self._backtest: BacktestResult | None = None
@@ -335,6 +341,18 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
             except KickbaseError as err:
                 _LOGGER.debug("Vereinsnamen nicht geladen: %s", err)
 
+        # Spielplan (Anpfiffzeiten) für den Aufstellungs-Wächter – alle paar Stunden reicht.
+        now = dt_util.utcnow()
+        if self._matchdays_at is None or now - self._matchdays_at > SCHEDULE_MAX_AGE:
+            try:
+                self._matchdays = await self.api.matchdays()
+                self._matchdays_at = now
+            except KickbaseError as err:
+                _LOGGER.debug("Spielplan nicht geladen: %s", err)
+        lineup = (
+            check_lineup(squad, current_matchday(self._matchdays), now) if self._matchdays else None
+        )
+
         my_id = self.api.user_id
         # Snapshot in the event loop – the background load may change the dicts meanwhile.
         plan, profiles = await self.hass.async_add_executor_job(
@@ -360,6 +378,7 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
             history_loaded_at=self._history_loaded_at,
             transfer_count=len(self._transfers),
             team_names=dict(self._team_names),
+            lineup=lineup,
         )
 
     def _compute_plan(

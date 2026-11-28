@@ -66,6 +66,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: KickbaseConfigEntry) -> 
     coordinator.async_setup_schedule()
     entry.async_on_unload(coordinator.async_cancel_schedule)
     entry.async_on_unload(coordinator.async_add_listener(automation.async_check_deadline))
+    entry.async_on_unload(coordinator.async_add_listener(automation.async_check_lineup))
     entry.async_on_unload(
         hass.bus.async_listen("mobile_app_notification_action", automation.async_handle_action)
     )
