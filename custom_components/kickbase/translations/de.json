@@ -57,7 +57,7 @@
           "lineup_lead_hours": "Vorlauf der Aufstellungs-Warnung",
           "injury_warn": "Warnung bei Verletzung",
           "upgrade_proposals": "Verstärkungs-Käufe vorschlagen",
-          "trend_sales": "Verkaufssignal bei fallendem Marktwert",
+          "trend_sales": "Verkaufssignale (Verletzung, fallender Marktwert)",
           "matchday_review": "Rückblick nach jedem Spieltag",
           "design": "Design des Dashboards"
         },
@@ -80,7 +80,7 @@
           "lineup_lead_hours": "So viele Stunden vor dem ersten Anpfiff des Spieltags wird gewarnt.",
           "injury_warn": "Wird ein eigener Spieler als verletzt gemeldet, kommt sofort eine Nachricht mit Verkaufsvorschlag (vor dem Marktwert-Update um 22:00). Verkauft wird nur nach deiner Bestätigung, auch in der Vollautomatik.",
           "upgrade_proposals": "Zu den Prüfzeiten Gebote auf Marktspieler vorschlagen, die laut Punkteprognose deutlich mehr bringen als dein schwächster Starter derselben Position. Immer mit Bestätigung.",
-          "trend_sales": "Spieler außerhalb deiner Top 11, deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem 14-Tage-Hoch liegt, zum Verkauf vorschlagen. Immer mit Bestätigung.",
+          "trend_sales": "Verletzte oder angeschlagene Spieler sofort (auch aus deiner Top 11) sowie Spieler außerhalb deiner Top 11, deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem 14-Tage-Hoch liegt, zum Verkauf vorschlagen – mit Wert und Gewinn/Verlust seit Kauf. Immer mit Bestätigung.",
           "matchday_review": "Nach dem letzten Spiel eines Spieltags: Punkte, Platz, Abstand, beste mögliche Startelf und Bilanz der Käufe.",
           "design": "Aussehen der Kickpilot-Karte (custom:kickpilot-card)."
         }
@@ -104,7 +104,7 @@
         "kaeufe": "Käufe (Gebote)",
         "verkaeufe": "Verkäufe",
         "verstaerkung": "Verstärkungen (Punkteprognose)",
-        "abwaertstrend": "Verkäufe bei fallendem Marktwert"
+        "abwaertstrend": "Verkäufe bei Verkaufssignalen (Verletzung, fallender Marktwert)"
       }
     },
     "design": {

@@ -403,7 +403,8 @@ class KickbaseCoordinator(DataUpdateCoordinator[KickbaseData]):
             if forecasts
             else []
         )
-        sells = trend_sales(squad, dict(self._history), now) if self._history_loaded_at else []
+        # Injured/doubtful signals need no history, so they appear right away.
+        sells = trend_sales(squad, dict(self._history) if self._history_loaded_at else {}, now)
         radar = league_radar(managers, my_id, await self._rivals(league, managers, my_id, now))
         capital = (
             capital_plan(

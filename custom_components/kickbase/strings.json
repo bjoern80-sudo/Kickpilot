@@ -57,7 +57,7 @@
           "lineup_lead_hours": "Lineup warning lead time",
           "injury_warn": "Warn on injury",
           "upgrade_proposals": "Propose upgrade buys",
-          "trend_sales": "Sell signal on falling value",
+          "trend_sales": "Sell signals (injury, falling value)",
           "matchday_review": "Review after each matchday",
           "design": "Dashboard design"
         },
@@ -80,7 +80,7 @@
           "lineup_lead_hours": "Warn this many hours before the first kick-off of the matchday.",
           "injury_warn": "When one of your players is reported injured, a notification with a sale proposal is sent right away (before the 22:00 market value update). The sale only happens after you confirm, even in full automation.",
           "upgrade_proposals": "At the check times, propose bids on market players whose points forecast clearly beats your weakest starter of the same position. Always to confirm.",
-          "trend_sales": "Propose selling players outside your top 11 whose value has fallen for 2 days and is at least 3 % below the 14-day high. Always to confirm.",
+          "trend_sales": "Propose selling injured or doubtful players right away (also from your top 11) and players outside your top 11 whose value has fallen for 2 days and is at least 3 % below the 14-day high. Shows value and gain/loss since purchase. Always to confirm.",
           "matchday_review": "After the last match of a matchday: points, placement, gap, best possible lineup and result of your buys.",
           "design": "Look of the Kickpilot card (custom:kickpilot-card)."
         }
@@ -104,7 +104,7 @@
         "kaeufe": "Buys (bids)",
         "verkaeufe": "Sales",
         "verstaerkung": "Upgrades (points forecast)",
-        "abwaertstrend": "Sales on falling value"
+        "abwaertstrend": "Sales on sell signals (injury, falling value)"
       }
     },
     "design": {

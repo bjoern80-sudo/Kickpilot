@@ -46,7 +46,17 @@ from .const import (
 )
 from .coordinator import KickbaseCoordinator
 from .insights import matchday_review
-from .planner import AutoRules, InjuryAlert, fmt_mio, injured_ids, injury_alerts, next_deadline
+from .planner import (
+    SELL_FALLING,
+    SELL_INJURED,
+    AutoRules,
+    InjuryAlert,
+    TrendSale,
+    fmt_mio,
+    injured_ids,
+    injury_alerts,
+    next_deadline,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -167,7 +177,7 @@ class KickbaseAutomation:
         if kind == KIND_UPGRADE:
             return [OrderItem(u.player.id, u.player.full_name, u.bid) for u in data.upgrades]
         if kind == KIND_TREND:
-            return [OrderItem(t.player.id, t.player.full_name, t.proceeds) for t in data.trend_sales]
+            return [OrderItem(t.player.id, t.player.full_name, t.proceeds) for t in data.trend_sales if t.sellable]
         return [OrderItem(s.player.id, s.player.full_name, s.expected_proceeds) for s in plan.sales]
 
     async def async_send_proposals(self, kind: str) -> str | None:
@@ -300,27 +310,22 @@ class KickbaseAutomation:
 
     @callback
     def async_check_trend_sales(self) -> None:
-        """Coordinator listener: value of a non-core player keeps falling → sale proposal (once per peak)."""
+        """Coordinator listener: sell signal (injured, doubtful, falling value) → sale proposal, once per signal."""
         data = self.coordinator.data
         if not data or not self.enabled or not opt(self.options, OPT_TREND_SALES):
             return
         alerted = set(self._state.get("trend_alerted", []))
-        new = [t for t in data.trend_sales if f"{t.player.id}:{t.peak_date.date()}" not in alerted]
+        # Newly injured players already get their own push (injury warning).
+        injury_push = opt(self.options, OPT_INJURY_WARN)
+        signals = [
+            t for t in data.trend_sales if t.sellable and not (injury_push and t.kind == SELL_INJURED)
+        ]
+        new = [t for t in signals if _signal_key(t) not in alerted]
         if not new:
             return
         # Keep only keys of current signals (+ the new ones) so the list stays small.
-        current = {f"{t.player.id}:{t.peak_date.date()}" for t in data.trend_sales}
-        self._state["trend_alerted"] = sorted(current)
-        items = [
-            OrderItem(
-                t.player.id,
-                t.player.full_name,
-                t.proceeds,
-                f"  {t.player.position_name}, außerhalb deiner Top 11: seit 2 Tagen fallend, "
-                f"{t.drop_pct:.1f}".replace(".", ",") + f" % unter dem Hoch von {fmt_mio(t.peak)} ({dt_util.as_local(t.peak_date):%d.%m.}).",
-            )
-            for t in new
-        ]
+        self._state["trend_alerted"] = sorted({_signal_key(t) for t in data.trend_sales})
+        items = [OrderItem(t.player.id, t.player.full_name, t.proceeds, _signal_detail(t)) for t in new]
         order = Order(self._token(), KIND_TREND, items)
         self.entry.async_create_background_task(
             self.hass, self._save_and_send(order), f"{DOMAIN}_trend"
@@ -450,7 +455,7 @@ class KickbaseAutomation:
             lines.append(f"Zusammen {eur(total)}")
             confirm = "Gebote bestätigen"
         elif order.kind == KIND_TREND:
-            title = "Kickbase: Marktwert fällt – verkaufen?"
+            title = "Kickbase: Verkaufssignal – verkaufen?"
             lines = []
             for i in order.items:
                 lines.append(f"{i.name}: ca. {eur(i.amount)}")
@@ -620,9 +625,14 @@ class KickbaseAutomation:
                     if not alert.sellable:
                         log.append(f"– {item.name}: {alert.reason}, übersprungen")
                         continue
-                elif not any(t.player.id == item.player_id for t in data.trend_sales):
-                    log.append(f"– {item.name}: Marktwert fällt nicht mehr bzw. Verkauf nicht mehr möglich, übersprungen")
-                    continue
+                else:
+                    signal = next((t for t in data.trend_sales if t.player.id == item.player_id), None)
+                    if signal is None:
+                        log.append(f"– {item.name}: kein Verkaufssignal mehr, übersprungen")
+                        continue
+                    if not signal.sellable:
+                        log.append(f"– {item.name}: {signal.reason}, übersprungen")
+                        continue
                 if dry:
                     log.append(f"✓ {prefix}{item.name} für ca. {eur(player.market_value)} an Kickbase verkaufen")
                     continue
@@ -728,3 +738,29 @@ class KickbaseAutomation:
     @staticmethod
     def _token() -> str:
         return secrets.token_hex(4)
+
+
+def _signal_key(t: TrendSale) -> str:
+    """One push per player and signal: falling value per peak, injured/doubtful per status."""
+    if t.kind == SELL_FALLING and t.peak_date is not None:
+        return f"{t.player.id}:{t.peak_date.date()}"
+    return f"{t.player.id}:{t.kind}"
+
+
+def _signal_detail(t: TrendSale) -> str:
+    p = t.player
+    if t.kind == SELL_FALLING:
+        why = (
+            f"außerhalb deiner Top 11: seit 2 Tagen fallend, "
+            + f"{t.drop_pct:.1f}".replace(".", ",")
+            + f" % unter dem Hoch von {fmt_mio(t.peak or 0)}"
+            + (f" ({dt_util.as_local(t.peak_date):%d.%m.})" if t.peak_date else "")
+        )
+    elif t.kind == SELL_INJURED:
+        why = "verletzt – vor dem Marktwert-Update um 22:00 Uhr verkaufen"
+    else:
+        why = "angeschlagen – Ausfall droht, Marktwert gefährdet"
+    gain = ""
+    if t.profit is not None:
+        gain = f", {'Gewinn' if t.profit >= 0 else 'Verlust'} seit Kauf {'+' if t.profit > 0 else ''}{eur(t.profit)}"
+    return f"  {p.position_name}, {why}. Wert {eur(t.value)}{gain}."

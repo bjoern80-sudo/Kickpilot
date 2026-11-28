@@ -55,7 +55,7 @@ Startelf auf dem Spielfeld und die Ersatzbank.
 | **Aufstellungs-Wächter** | Die Aufstellung muss vor dem ersten Anpfiff des Spieltags stehen (meist Freitag 20:30 Uhr) und gilt dann für den ganzen Spieltag. Vorher prüft Kickpilot deine Startelf: alle 11 Plätze besetzt, alle fit, Verein spielt an diesem Spieltag. Bei einem Problem kommt eine Push-Nachricht mit dem besten fitten Ersatz von der Bank (Standard: 2 Stunden vorher). Tipps zeigen Bankspieler, die im Schnitt deutlich mehr Punkte holen. Die Aufstellung änderst du selbst in der Kickbase-App. |
 | **Punkteprognose** | Erwartete Punkte jedes Spielers am nächsten Spieltag: halb Saison-Ø, halb Ø der letzten 4 Spieltage, mal Einsatzquote, angepasst an den Tabellenplatz des Gegners (±20 %) und Heim/Auswärts (±5 %). Steht in der Karte bei Startelf und Bank. |
 | **Verstärkungen** | Zu den Prüfzeiten schlägt Kickpilot Gebote auf Marktspieler vor, die laut Prognose mindestens 20 Punkte mehr bringen als dein schwächster Starter derselben Position. Es gelten dieselben Budgetregeln wie bei den Kaufvorschlägen. Immer mit Bestätigung, auch in der Vollautomatik. |
-| **Verkaufssignale** | Spieler außerhalb deiner Top 11, deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem 14-Tage-Hoch liegt, schlägt Kickpilot zum Verkauf vor (mit Bestätigung). |
+| **Verkaufssignale** | Verletzte und angeschlagene Spieler sofort – auch aus deiner Top 11 –, außerdem Spieler außerhalb deiner Top 11, deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem 14-Tage-Hoch liegt. Die Liste zeigt den aktuellen Wert und deinen Gewinn bzw. Verlust seit dem Kauf; die Mindestbesetzung bleibt erhalten. Verkauf immer mit Bestätigung. |
 | **Konkurrenz-Radar** | Alle Manager mit Punkten, Abstand zum Ersten, Spieltagspunkten, Teamwert und verletzten oder gesperrten Spielern in ihrer Startelf. |
 | **Kapitalplan** | Budget + Teamwert, Zuwachs pro Tag (Ø 14 Tage) und Hochrechnung zur Winterpause und zum Saisonende, dazu die Kaufkraft. |
 | **Spieltags-Rückblick** | Nach dem letzten Spiel eines Spieltags: deine Punkte und Plätze, Abstand zum Ersten, die beste mögliche Startelf aus deinem Kader und die Marktwert-Bilanz deiner Käufe der letzten 7 Tage. |
@@ -158,7 +158,7 @@ Alles lässt sich später unter **Einstellungen → Geräte & Dienste → Kickba
 | Vorlauf der Aufstellungs-Warnung | 2 h | So lange vor dem ersten Anpfiff des Spieltags wird gewarnt |
 | Warnung bei Verletzung | an | Push-Nachricht mit Verkaufsvorschlag, wenn ein eigener Spieler verletzt gemeldet wird |
 | Verstärkungs-Käufe vorschlagen | an | Gebote nach Punkteprognose, immer mit Bestätigung |
-| Verkaufssignal bei fallendem Marktwert | an | Verkaufsvorschlag für Spieler außerhalb der Top 11, immer mit Bestätigung |
+| Verkaufssignale (Verletzung, fallender Marktwert) | an | Verkaufsvorschlag für verletzte/angeschlagene Spieler und für Spieler außerhalb der Top 11 mit fallendem Marktwert, immer mit Bestätigung |
 | Rückblick nach jedem Spieltag | an | Push-Nachricht nach dem letzten Spiel |
 | Design des Dashboards | App-Design | Aussehen der Kickpilot-Karte |
 

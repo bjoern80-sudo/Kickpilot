@@ -711,29 +711,60 @@ struct UpgradeProposal: Identifiable, Hashable {
     }
 }
 
-// MARK: - Sell signal: falling market value
-// Same as trend_sales in planner.py. Players outside the best 11 whose market value has
-// fallen two days in a row and is clearly below its recent peak.
+// MARK: - Sell signals: injured / doubtful players and falling market value
+// Same as trend_sales in planner.py.
+// 1. Injured (`st` 1) or doubtful (`st` 2) players: always, immediately, also in the best 11.
+//    Not sellable if the minimum per position would be broken (still listed, with reason).
+// 2. Players outside the best 11 whose market value has fallen two days in a row and is
+//    clearly below its recent peak.
 
 enum TrendSaleRules {
     static let fallingDays = 2
     static let peakLookbackDays = 14
     static let minDropPct = 3.0
+    /// `st` values that trigger a sell signal right away: 1 verletzt, 2 angeschlagen.
+    static let statusSignals: [Int] = [1, 2]
 }
 
 struct TrendSale: Identifiable, Hashable {
+    enum Kind: String, Hashable { case injured = "verletzt", doubtful = "angeschlagen", falling = "abwaertstrend" }
+
     let player: Player
+    let kind: Kind
     let proceeds: Double
     let dropPct: Double
-    let peak: Double
-    let peakDate: Date
+    let peak: Double?
+    let peakDate: Date?
+    let sellable: Bool
+    /// Why a sale is not possible, otherwise "".
+    let reason: String
     var id: String { player.id }
+    /// Current market value (= proceeds on a sale to Kickbase).
+    var value: Double { player.marketValue }
+    /// Gain or loss since purchase (`mvgl`), nil if Kickbase does not say.
+    var profit: Double? { player.gainSincePurchase }
 
     static func signals(squad: [Player], history: [String: [MVPoint]], now: Date = Date()) -> [TrendSale] {
-        let core = Set(squad.sorted { $0.averagePoints > $1.averagePoints }.prefix(AutoRules.keepCore).map(\.id))
+        let byAvg = squad.sorted { $0.averagePoints > $1.averagePoints }
+        let core = Set(byAvg.prefix(AutoRules.keepCore).map(\.id))
         var perPosition = Dictionary(grouping: squad, by: \.position).mapValues(\.count)
         var result: [TrendSale] = []
-        for p in squad where !core.contains(p.id) && !p.onMarket {
+        // 1. Status signals (injured first, then doubtful; weakest Ø first within a status).
+        for st in TrendSaleRules.statusSignals {
+            for p in byAvg.reversed() where p.status == st && !p.onMarket {
+                let minimum = AutoRules.minPerPosition[p.position] ?? 0
+                let sellable = perPosition[p.position, default: 0] > minimum
+                result.append(.init(player: p, kind: st == 1 ? .injured : .doubtful,
+                                    proceeds: p.marketValue * AutoRules.kickbaseSaleFactor,
+                                    dropPct: 0, peak: nil, peakDate: nil, sellable: sellable,
+                                    reason: sellable ? "" : "Mindestbesetzung (\(minimum) \(p.positionName))"))
+                if sellable { perPosition[p.position, default: 0] -= 1 }
+            }
+        }
+        // 2. Falling market value.
+        var falling: [TrendSale] = []
+        let flagged = Set(result.map(\.id))
+        for p in squad where !core.contains(p.id) && !p.onMarket && !flagged.contains(p.id) {
             guard perPosition[p.position, default: 0] > (AutoRules.minPerPosition[p.position] ?? 0) else { continue }
             let h = historyWithCurrent(history[p.id] ?? [], current: p.marketValue, now: now)
             let n = TrendSaleRules.fallingDays
@@ -744,10 +775,10 @@ struct TrendSale: Identifiable, Hashable {
             guard let peak = window.max(by: { $0.value < $1.value }), peak.value > 0, let last = h.last else { continue }
             let drop = (1 - last.value / peak.value) * 100
             guard drop >= TrendSaleRules.minDropPct else { continue }
-            result.append(.init(player: p, proceeds: p.marketValue * AutoRules.kickbaseSaleFactor,
-                                dropPct: drop, peak: peak.value, peakDate: peak.date))
+            falling.append(.init(player: p, kind: .falling, proceeds: p.marketValue * AutoRules.kickbaseSaleFactor,
+                                 dropPct: drop, peak: peak.value, peakDate: peak.date, sellable: true, reason: ""))
             perPosition[p.position, default: 0] -= 1
         }
-        return result.sorted { $0.dropPct > $1.dropPct }
+        return result + falling.sorted { $0.dropPct > $1.dropPct }
     }
 }

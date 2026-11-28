@@ -19,7 +19,13 @@ final class AppState: ObservableObject {
     }
 
     @Published var budget: Double = 0
-    @Published var squad: [Player] = [] { didSet { updateInjuries() } }
+    @Published var squad: [Player] = [] {
+        didSet {
+            updateInjuries()
+            // Injured/doubtful players get a sell signal right away, without waiting for the plan.
+            trendSales = TrendSale.signals(squad: squad, history: mvHistory)
+        }
+    }
     /// Own players newly reported injured – shown in the team view until sold or dismissed.
     @Published var injuryAlerts: [InjuryAlert] = []
     /// Points forecast for the next matchday (player id → points), sporting buys and sell signals.

@@ -107,8 +107,11 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   (Platz 1 −20 % … Platz 18 +20 %) × Heim 1,05 / Auswärts 0,95; angeschlagen ×0,5, sonst nicht fit = 0.
 - Verstärkung: Marktspieler (Ablauf heute, fit) mit Prognose ≥ schwächster Starter gleicher Position + 20;
   Gebot = `recommended_bid`, gleiche Budget-/Kader-/Vereinsregeln. IMMER mit Bestätigung (Art `verstaerkung`).
-- Verkaufssignal: außerhalb Top 11, MW 2 Tage in Folge gefallen, ≥ 3 % unter 14-Tage-Hoch, Mindestbesetzung.
-  Einmal je Spieler + Hochdatum, IMMER mit Bestätigung (Art `abwaertstrend`), zählt nicht zum Freitagslimit.
+- Verkaufssignal (`TrendSale`/`trend_sales`): (1) sofort bei `st` 1 verletzt / 2 angeschlagen, auch Top 11, ohne
+  MW-Verlauf; bei Unterschreiten der Mindestbesetzung gelistet, aber `sellable` = false. (2) außerhalb Top 11, MW 2 Tage
+  in Folge gefallen, ≥ 3 % unter 14-Tage-Hoch, Mindestbesetzung. Liste zeigt Wert (MW) und Gewinn/Verlust (`mvgl`).
+  Push einmal je Spieler + Hochdatum bzw. + Status (Verletzte nicht, wenn `injury_warn` schon pusht), IMMER mit
+  Bestätigung (Art `abwaertstrend`), zählt nicht zum Freitagslimit.
 - Nur HA (`insights.py`): Konkurrenz-Radar, Kapitalplan (Zuwachs = Kaderwert-Änderung 14 Tage / 14,
   Winterpause = Lücke > 14 Tage zwischen Spieltagen), Spieltags-Rückblick (beste Startelf aus `ph[0]` über die
   Kickbase-Formationen, einmal je beendetem Spieltag, Store-Key `reviewed_day`).

@@ -300,29 +300,56 @@ struct AutoTransferView: View {
     }
 
     private func trendText(_ t: TrendSale) -> String {
-        let pct = String(format: "%.1f", t.dropPct).replacingOccurrences(of: ".", with: ",")
-        return "\(pct) % unter dem Hoch (\(Fmt.eur(t.peak))) – seit 2 Tagen fallend"
+        switch t.kind {
+        case .injured: return "Verletzt – vor dem MW-Update um 22:00 Uhr verkaufen"
+        case .doubtful: return "Angeschlagen – Ausfall droht, Marktwert gefährdet"
+        case .falling:
+            let pct = String(format: "%.1f", t.dropPct).replacingOccurrences(of: ".", with: ",")
+            return "\(pct) % unter dem Hoch (\(t.peak.map(Fmt.eur) ?? "–")) – seit 2 Tagen fallend"
+        }
+    }
+
+    @ViewBuilder
+    private func trendRow(_ t: TrendSale) -> some View {
+    HStack {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 6) {
+                Text("\(t.player.fullName) (\(t.player.positionName))").fontWeight(.semibold)
+                if t.kind != .falling {
+                    Badge(text: t.player.statusShort, color: .loss, help: t.player.statusText)
+                }
+            }
+            Text(trendText(t))
+                .font(.caption).foregroundColor(.secondary)
+            if !t.sellable {
+                Text("Verkauf nicht möglich: \(t.reason).").font(.caption).foregroundColor(.loss)
+            }
+        }
+        Spacer()
+        VStack(alignment: .trailing, spacing: 1) {
+            Text(Fmt.eur(t.value)).monospacedDigit()
+            Text("Wert").font(.caption).foregroundColor(.secondary)
+        }
+        VStack(alignment: .trailing, spacing: 1) {
+            Text(t.profit.map(Fmt.signedEur) ?? "–").monospacedDigit()
+                .foregroundColor(Theme.signColor(t.profit ?? 0))
+            Text(profitLabel(t)).font(.caption).foregroundColor(.secondary)
+        }
+        .frame(minWidth: 110, alignment: .trailing)
+        Button("Verkaufen …") { confirmTrend = t }.disabled(executing || !t.sellable)
+    }
     }
 
     private var trendSection: some View {
         Card(title: "Verkaufssignale",
-             info: "Spieler außerhalb deiner Top 11, deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem Hoch der letzten 14 Tage liegt. Verkauf an Kickbase bringt 100 % des aktuellen Marktwerts.") {
+             info: "Verletzte und angeschlagene Spieler sofort (auch aus deiner Top 11), außerdem Spieler außerhalb deiner Top 11, deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem Hoch der letzten 14 Tage liegt. Gewinn/Verlust = Marktwert-Änderung seit dem Kauf. Verkauf an Kickbase bringt 100 % des aktuellen Marktwerts; die Mindestbesetzung bleibt erhalten.") {
             VStack(alignment: .leading, spacing: 6) {
                 if state.trendSales.isEmpty {
-                    Text("Kein Spieler außerhalb deiner Top 11 verliert gerade deutlich an Wert.")
+                    Text("Kein verletzter oder angeschlagener Spieler, und niemand außerhalb deiner Top 11 verliert gerade deutlich an Wert.")
                         .font(.callout).foregroundColor(.secondary)
                 }
                 ForEach(state.trendSales) { t in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("\(t.player.fullName) (\(t.player.positionName))").fontWeight(.semibold)
-                            Text(trendText(t))
-                                .font(.caption).foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        Text(Fmt.eur(t.proceeds)).monospacedDigit()
-                        Button("Verkaufen …") { confirmTrend = t }.disabled(executing)
-                    }
+                    trendRow(t)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -337,8 +364,21 @@ struct AutoTransferView: View {
             }
             Button("Abbrechen", role: .cancel) {}
         } message: { _ in
-            Text("Der Spieler wird sofort an Kickbase verkauft – das ist nicht rückgängig zu machen.")
+            Text(confirmTrendMessage)
         }
+    }
+
+    private func profitLabel(_ t: TrendSale) -> String {
+        guard let g = t.profit else { return "seit Kauf" }
+        return g >= 0 ? "Gewinn" : "Verlust"
+    }
+
+    private var confirmTrendMessage: String {
+        var text = "Der Spieler wird sofort an Kickbase verkauft – das ist nicht rückgängig zu machen."
+        if let g = confirmTrend?.profit {
+            text += " " + (g >= 0 ? "Gewinn" : "Verlust") + " seit Kauf: \(Fmt.signedEur(g))."
+        }
+        return text
     }
 
     @ViewBuilder

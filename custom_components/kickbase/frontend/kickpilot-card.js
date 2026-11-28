@@ -111,8 +111,9 @@ const INFO = {
     "dein schwächster Starter derselben Position. Gebot und Budgetregeln wie bei den Kaufvorschlägen. " +
     "Nie automatisch – immer mit Bestätigung.",
   trend_sales:
-    "Spieler außerhalb deiner Top 11 (Ø-Punkte), deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem " +
-    "Hoch der letzten 14 Tage liegt. Verkauf an Kickbase bringt 100 % des aktuellen Marktwerts – vor dem nächsten " +
+    "Verletzte und angeschlagene Spieler sofort – auch aus deiner Top 11. Außerdem Spieler außerhalb deiner " +
+    "Top 11 (Ø-Punkte), deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem Hoch der letzten 14 Tage " +
+    "liegt. Wert = aktueller Marktwert, Gewinn/Verlust = Änderung seit dem Kauf. Verkauf an Kickbase bringt 100 % des aktuellen Marktwerts – vor dem nächsten " +
     "Update um 22:00 Uhr noch den heutigen. Mindestbesetzung bleibt erhalten. Immer mit Bestätigung.",
   radar:
     "Alle Manager der Liga mit Gesamtpunkten, Abstand zum Ersten, Punkten am aktuellen Spieltag und Teamwert. " +
@@ -472,7 +473,7 @@ class KickpilotCard extends HTMLElement {
   _askExecute(kind) {
     const buys = kind === "kaeufe" || kind === "verstaerkung";
     const source = { kaeufe: "buy_proposals", verkaeufe: "sale_proposals", verstaerkung: "upgrades", abwaertstrend: "trend_sales" }[kind];
-    const items = this._attr(source, "vorschlaege", []);
+    const items = this._attr(source, "vorschlaege", []).filter((p) => p.verkaufbar !== false);
     if (!items.length) return;
     const dry = this._attr("automation", "trockenlauf", false);
     const lines = items.map((p) => `${p.name}: ${eur(buys ? p.gebot : p.erloes)}`);
@@ -729,19 +730,30 @@ class KickpilotCard extends HTMLElement {
 
   _trendSales() {
     const items = this._attr("trend_sales", "vorschlaege", []);
+    const why = (t) => {
+      if (t.grund === "verletzt") return "🚑 Verletzt – vor dem MW-Update um 22:00 Uhr verkaufen";
+      if (t.grund === "angeschlagen") return "⚠️ Angeschlagen – Ausfall droht";
+      return `${PCT.format(t.unter_hoch_pct)} % unter dem Hoch (${mio(t.hoch)}, ${esc(shortDay(t.hoch_am))})`;
+    };
+    const gain = (t) =>
+      t.gewinn == null
+        ? `<div class="name">–</div><div class="meta">seit Kauf</div>`
+        : `<div class="name ${t.gewinn >= 0 ? "pos" : "neg"}">${t.gewinn > 0 ? "+" : ""}${eur(t.gewinn)}</div><div class="meta">${t.gewinn >= 0 ? "Gewinn" : "Verlust"}</div>`;
+    const sellable = items.filter((t) => t.verkaufbar !== false);
     const body = items.length
       ? `<div class="list">${items
           .map(
             (t) => `<div class="item">${this._badge(t.position)}
             <div class="grow"><div class="name">${esc(t.name)}${this._clubTag(t.verein)}</div>
-            <div class="meta">${PCT.format(t.unter_hoch_pct)} % unter dem Hoch (${mio(t.hoch)}, ${esc(shortDay(t.hoch_am))})</div></div>
-            <div class="right"><div class="name">${eur(t.erloes)}</div><div class="meta">Erlös</div></div></div>`
+            <div class="meta">${why(t)}${t.verkaufbar === false ? ` · Verkauf nicht möglich: ${esc(t.hinweis)}` : ""}</div></div>
+            <div class="right"><div class="name">${eur(t.wert ?? t.erloes)}</div><div class="meta">Wert</div></div>
+            <div class="right">${gain(t)}</div></div>`
           )
           .join("")}</div>
-          <div class="actions">
+          ${sellable.length ? `<div class="actions">
             <button class="danger" data-act="execute" data-arg="abwaertstrend" ${this._busy ? "disabled" : ""}><ha-icon icon="mdi:cash-fast"></ha-icon>${this._busy === "execute" ? "Läuft …" : "Verkaufen"}</button>
-          </div>`
-      : `<div class="empty">Kein Spieler außerhalb deiner Top 11 verliert gerade deutlich an Wert.</div>`;
+          </div>` : ""}`
+      : `<div class="empty">Kein verletzter oder angeschlagener Spieler, und niemand außerhalb deiner Top 11 verliert gerade deutlich an Wert.</div>`;
     return `<div class="card s6">
       <div class="head"><div class="h"><ha-icon icon="mdi:trending-down"></ha-icon>Verkaufssignale${this._info_icon("trend_sales")}</div><span class="count">${items.length}</span></div>
       ${body}

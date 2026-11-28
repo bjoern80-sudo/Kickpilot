@@ -801,24 +801,45 @@ def upgrade_proposals(
     return result
 
 
-# ---- sell signal: falling market value ----------------------------------------------
-# Same as TrendSale in AutoTransfer.swift. Players outside the best 11 whose market value
-# has fallen two days in a row and is clearly below its recent peak.
+# ---- sell signals: injured / doubtful players and falling market value ------------------
+# Same as TrendSale in AutoTransfer.swift.
+# 1. Injured (`st` 1) or doubtful (`st` 2) players: always, immediately, also in the best 11.
+#    Not sellable if the minimum per position would be broken (still listed, with reason).
+# 2. Players outside the best 11 whose market value has fallen two days in a row and is
+#    clearly below its recent peak.
+
+SELL_INJURED = "verletzt"
+SELL_DOUBTFUL = "angeschlagen"
+SELL_FALLING = "abwaertstrend"
 
 
 class TrendSaleRules:
     falling_days = 2
     peak_lookback_days = 14
     min_drop_pct = 3.0
+    status_signals = (1, 2)  # `st` 1 verletzt, 2 angeschlagen
 
 
 @dataclass
 class TrendSale:
     player: Player
+    kind: str  # SELL_INJURED / SELL_DOUBTFUL / SELL_FALLING
     proceeds: float
-    drop_pct: float  # below the peak of the last 14 days
-    peak: float
-    peak_date: datetime
+    drop_pct: float  # below the peak of the last 14 days (falling only)
+    peak: float | None
+    peak_date: datetime | None
+    sellable: bool = True
+    reason: str = ""  # why a sale is not possible, otherwise ""
+
+    @property
+    def value(self) -> float:
+        """Current market value (= proceeds on a sale to Kickbase)."""
+        return self.player.market_value
+
+    @property
+    def profit(self) -> float | None:
+        """Gain or loss since purchase (`mvgl`), None if Kickbase does not say."""
+        return self.player.gain_since_purchase
 
 
 def trend_sales(squad: list[Player], history: dict[str, list[MVPoint]], now: datetime) -> list[TrendSale]:
@@ -828,8 +849,32 @@ def trend_sales(squad: list[Player], history: dict[str, list[MVPoint]], now: dat
     for p in squad:
         per_position[p.position] = per_position.get(p.position, 0) + 1
     result: list[TrendSale] = []
+    # 1. Status signals (injured first, then doubtful; weakest Ø first within a status).
+    for st in TrendSaleRules.status_signals:
+        for p in reversed(by_avg):
+            if p.status != st or p.on_market:
+                continue
+            minimum = AutoRules.min_per_position.get(p.position, 0)
+            sellable = per_position.get(p.position, 0) > minimum
+            result.append(
+                TrendSale(
+                    p,
+                    SELL_INJURED if st == 1 else SELL_DOUBTFUL,
+                    p.market_value * AutoRules.kickbase_sale_factor,
+                    0.0,
+                    None,
+                    None,
+                    sellable,
+                    "" if sellable else f"Mindestbesetzung ({minimum} {p.position_name})",
+                )
+            )
+            if sellable:
+                per_position[p.position] -= 1
+    # 2. Falling market value.
+    flagged = {t.player.id for t in result}
+    falling: list[TrendSale] = []
     for p in squad:
-        if p.id in core or p.on_market:
+        if p.id in core or p.on_market or p.id in flagged:
             continue
         if per_position.get(p.position, 0) <= AutoRules.min_per_position.get(p.position, 0):
             continue
@@ -845,6 +890,8 @@ def trend_sales(squad: list[Player], history: dict[str, list[MVPoint]], now: dat
         drop = (1 - h[-1].value / peak.value) * 100 if peak.value > 0 else 0.0
         if drop < TrendSaleRules.min_drop_pct:
             continue
-        result.append(TrendSale(p, p.market_value * AutoRules.kickbase_sale_factor, drop, peak.value, peak.date))
+        falling.append(
+            TrendSale(p, SELL_FALLING, p.market_value * AutoRules.kickbase_sale_factor, drop, peak.value, peak.date)
+        )
         per_position[p.position] -= 1
-    return sorted(result, key=lambda t: t.drop_pct, reverse=True)
+    return result + sorted(falling, key=lambda t: t.drop_pct, reverse=True)

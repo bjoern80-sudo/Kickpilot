@@ -164,10 +164,16 @@ def _trend_attrs(d: KickbaseData) -> dict[str, Any]:
                 "name": t.player.full_name,
                 "verein": t.player.team_id,
                 "position": t.player.position_name,
+                "grund": t.kind,
+                "status": t.player.status,
                 "erloes": round(t.proceeds),
+                "wert": round(t.value),
+                "gewinn": round(t.profit) if t.profit is not None else None,
                 "unter_hoch_pct": round(t.drop_pct, 1),
-                "hoch": round(t.peak),
-                "hoch_am": _iso(t.peak_date),
+                "hoch": round(t.peak) if t.peak is not None else None,
+                "hoch_am": _iso(t.peak_date) if t.peak_date else None,
+                "verkaufbar": t.sellable,
+                "hinweis": t.reason,
             }
             for t in d.trend_sales
         ]
