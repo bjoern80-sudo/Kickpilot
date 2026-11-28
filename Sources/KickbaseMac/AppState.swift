@@ -19,7 +19,9 @@ final class AppState: ObservableObject {
     }
 
     @Published var budget: Double = 0
-    @Published var squad: [Player] = []
+    @Published var squad: [Player] = [] { didSet { updateInjuries() } }
+    /// Own players newly reported injured – shown in the team view until sold or dismissed.
+    @Published var injuryAlerts: [InjuryAlert] = []
     @Published var market: [Player] = []
     @Published var managers: [Manager] = []
     @Published var teams: [String: Team] = [:]
@@ -120,6 +122,44 @@ final class AppState: ObservableObject {
     /// Lineup guard for the current matchday (read-only hints, never changes the lineup).
     var lineupCheck: LineupCheck? {
         matchdays.isEmpty ? nil : LineupCheck.check(squad: squad, matchday: Matchday.current(matchdays))
+    }
+
+    /// Compares the squad with the injured players seen last time (stored per league).
+    /// First run: remembers current injuries without warning.
+    private func updateInjuries() {
+        guard !squad.isEmpty, let league = currentLeague else { return }
+        let key = "knownInjured.\(league.id)"
+        let current = InjuryAlert.injuredIds(squad)
+        guard let stored = UserDefaults.standard.array(forKey: key) as? [String] else {
+            UserDefaults.standard.set(Array(current), forKey: key)
+            return
+        }
+        let fresh = InjuryAlert.alerts(squad: squad, knownInjured: Set(stored))
+        if Set(stored) != current { UserDefaults.standard.set(Array(current), forKey: key) }
+        // Refresh open alerts; drop players no longer injured or no longer in the squad.
+        let all = InjuryAlert.alerts(squad: squad, knownInjured: [])
+        injuryAlerts = injuryAlerts.compactMap { old in all.first { $0.player.id == old.player.id } }
+        if !fresh.isEmpty {
+            injuryAlerts += fresh.filter { f in !injuryAlerts.contains { $0.player.id == f.player.id } }
+            NSApp.requestUserAttention(.criticalRequest)
+        }
+    }
+
+    func dismissInjury(_ alert: InjuryAlert) {
+        injuryAlerts.removeAll { $0.player.id == alert.player.id }
+    }
+
+    /// REAL transaction: sells a newly injured player to Kickbase (after confirmation in the UI).
+    func sellInjured(_ alert: InjuryAlert) async -> String {
+        let check = InjuryAlert.alerts(squad: squad, knownInjured: []).first { $0.player.id == alert.player.id }
+        guard let check, check.sellable else {
+            return "– \(alert.player.fullName): \(check?.reason ?? "nicht mehr als verletzt gemeldet"), nicht verkauft"
+        }
+        let log = await executeSales([SaleProposal(
+            player: check.player, expectedProceeds: check.proceeds, gainPct: 0, gainBasis: ""
+        )])
+        dismissInjury(alert)
+        return log.joined(separator: "\n")
     }
 
     // MARK: - Loading

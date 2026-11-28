@@ -55,6 +55,7 @@
           "dry_run": "Dry run",
           "lineup_warn": "Warn before kick-off",
           "lineup_lead_hours": "Lineup warning lead time",
+          "injury_warn": "Warn on injury",
           "design": "Dashboard design"
         },
         "data_description": {
@@ -74,6 +75,7 @@
           "dry_run": "Only log, never execute.",
           "lineup_warn": "Send a notification before kick-off if a starter is injured or suspended, his club does not play or slots are empty. The lineup is never changed.",
           "lineup_lead_hours": "Warn this many hours before the kick-off of the affected player's match.",
+          "injury_warn": "When one of your players is reported injured, a notification with a sale proposal is sent right away (before the 22:00 market value update). The sale only happens after you confirm, even in full automation.",
           "design": "Look of the Kickpilot card (custom:kickpilot-card)."
         }
       }

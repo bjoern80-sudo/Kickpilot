@@ -53,6 +53,7 @@ Startelf auf dem Spielfeld und die Ersatzbank.
 | **Überblick** | Sensoren für Budget, Teamwert, Budget nach offenen Geboten, Minus-Grenze, Gebotsrahmen bis Freitag, Platz in der Liga und Kadergröße. HA speichert den Verlauf, damit siehst du Budget und Teamwert über Wochen. |
 | **Kaufvorschläge** | Zu festen Prüfzeiten sucht Kickpilot Spieler auf dem Transfermarkt, deren Marktwert voraussichtlich steigt, und schlägt ein passendes Gebot vor. |
 | **Aufstellungs-Wächter** | Vor jedem Anpfiff prüft Kickpilot deine Startelf: alle 11 Plätze besetzt, alle fit, Verein spielt an diesem Spieltag. Bei einem Problem kommt eine Push-Nachricht mit dem besten fitten Ersatz von der Bank (Standard: 2 Stunden vor dem Spiel des Spielers). Tipps zeigen Bankspieler, die im Schnitt deutlich mehr Punkte holen. Die Aufstellung änderst du selbst in der Kickbase-App. |
+| **Verletzungs-Warnung** | Wird einer deiner Spieler als verletzt gemeldet, kommt sofort eine Push-Nachricht mit Verkaufsvorschlag. Verletzte Spieler verlieren meist an Wert, und Kickbase aktualisiert die Marktwerte erst um 22:00 Uhr: Bis dahin bringt der Verkauf noch den heutigen Marktwert. Verkauft wird nur nach deinem Tipp auf **Verkaufen bestätigen**, auch in der Vollautomatik. Die Mindestbesetzung (1 Torhüter, 3 Abwehrspieler, 1 Stürmer) bleibt immer erhalten. |
 | **Freitags-Ausgleich** | Ist dein Budget vor Freitag 20:30 Uhr im Minus, schlägt Kickpilot Verkäufe vor. Schwache Spieler mit gutem Wertzuwachs gehen zuerst, deine Top 11 zuletzt. |
 | **Push-Nachrichten** | Vorschläge, Warnungen und Ergebnisse gehen an die Benachrichtigungsziele, die du auswählst, z. B. die Companion-App auf dem iPhone. Bestätigen und Ablehnen geht direkt aus der Nachricht. |
 | **Halb- oder vollautomatisch** | Standard ist halbautomatisch: nichts passiert ohne deine Bestätigung. Die Vollautomatik musst du ausdrücklich einschalten, und sie hat Grenzen pro Prüfung und Tag. |
@@ -149,6 +150,7 @@ Alles lässt sich später unter **Einstellungen → Geräte & Dienste → Kickba
 | Trockenlauf | an | Nur protokollieren, nichts ausführen |
 | Warnung vor dem Anpfiff | an | Push-Nachricht, wenn die Startelf ein Problem hat |
 | Vorlauf der Aufstellungs-Warnung | 2 h | So lange vor dem Anpfiff des betroffenen Spielers wird gewarnt |
+| Warnung bei Verletzung | an | Push-Nachricht mit Verkaufsvorschlag, wenn ein eigener Spieler verletzt gemeldet wird |
 | Design des Dashboards | App-Design | Aussehen der Kickpilot-Karte |
 
 **Notbremse:** Der Schalter **Automatik aktiv** stoppt alle geplanten Prüfungen und Nachrichten.

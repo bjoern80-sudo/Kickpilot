@@ -551,3 +551,41 @@ enum AutoPlanner {
         return result
     }
 }
+
+// MARK: - Injury warning
+// Same as injury_alerts in planner.py. Kickbase updates market values at 22:00; an
+// injured player usually loses value from the next update on, so selling before 22:00
+// still brings today's market value (100 % on a sale to Kickbase).
+
+struct InjuryAlert: Identifiable, Hashable {
+    static let injuredStatus = 1 // `st` 1 = verletzt
+
+    let player: Player
+    let proceeds: Double
+    let sellable: Bool
+    /// Why a sale is not possible, otherwise "".
+    let reason: String
+    /// Among the best 11 by Ø points.
+    let inCore: Bool
+    var id: String { player.id }
+
+    /// Own players newly reported injured since the last check (`knownInjured`).
+    static func alerts(squad: [Player], knownInjured: Set<String>) -> [InjuryAlert] {
+        let byAvg = squad.sorted { $0.averagePoints > $1.averagePoints }
+        let core = Set(byAvg.prefix(AutoRules.keepCore).map(\.id))
+        let perPosition = Dictionary(grouping: squad, by: \.position).mapValues(\.count)
+        return byAvg.filter { $0.status == injuredStatus && !knownInjured.contains($0.id) }.map { p in
+            let minimum = AutoRules.minPerPosition[p.position] ?? 0
+            let sellable = perPosition[p.position, default: 0] > minimum
+            return InjuryAlert(
+                player: p, proceeds: p.marketValue * AutoRules.kickbaseSaleFactor, sellable: sellable,
+                reason: sellable ? "" : "Mindestbesetzung (\(minimum) \(p.positionName))",
+                inCore: core.contains(p.id)
+            )
+        }
+    }
+
+    static func injuredIds(_ squad: [Player]) -> Set<String> {
+        Set(squad.filter { $0.status == injuredStatus }.map(\.id))
+    }
+}

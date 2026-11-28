@@ -5,6 +5,8 @@ struct TeamView: View {
     @EnvironmentObject var state: AppState
     @State private var sortOrder = [KeyPathComparator(\Player.marketValue, order: .reverse)]
     @State private var detailPlayer: Player? = nil
+    @State private var sellAlert: InjuryAlert? = nil
+    @State private var sellResult: String? = nil
 
     private var teamValue: Double { state.squad.reduce(0.0) { $0 + $1.marketValue } }
     private var trend: Double { state.squad.reduce(0.0) { $0 + $1.trend24h } }
@@ -21,6 +23,9 @@ struct TeamView: View {
                 StatCard(title: "Punkte (Kader)", value: Fmt.int(points))
                 StatCard(title: "Spieler", value: "\(state.squad.count)")
             }
+            ForEach(state.injuryAlerts) { a in
+                InjuryBanner(alert: a, onSell: { sellAlert = a }, onDismiss: { state.dismissInjury(a) })
+            }
             if let check = state.lineupCheck { LineupBanner(check: check) }
             PlayerTable(players: state.squad, sortOrder: $sortOrder) { detailPlayer = $0 }
         }
@@ -28,6 +33,59 @@ struct TeamView: View {
         .sheet(item: $detailPlayer) { p in
             PlayerDetailView(player: p).environmentObject(state)
         }
+        .confirmationDialog(
+            sellAlert.map { "\($0.player.fullName) an Kickbase verkaufen?" } ?? "",
+            isPresented: Binding(get: { sellAlert != nil }, set: { if !$0 { sellAlert = nil } }),
+            presenting: sellAlert
+        ) { a in
+            Button("Für ca. \(Fmt.eur(a.proceeds)) verkaufen", role: .destructive) {
+                Task { sellResult = await state.sellInjured(a) }
+            }
+            Button("Abbrechen", role: .cancel) {}
+        } message: { _ in
+            Text("Echte Transaktion: Der Spieler wird gelistet und sofort an Kickbase verkauft (100 % des Marktwerts). Das lässt sich nicht rückgängig machen.")
+        }
+        .alert("Verkauf", isPresented: Binding(get: { sellResult != nil }, set: { if !$0 { sellResult = nil } })) {
+            Button("OK") {}
+        } message: {
+            Text(sellResult ?? "")
+        }
+    }
+}
+
+/// Newly injured own player: sell before the 22:00 market value update?
+struct InjuryBanner: View {
+    let alert: InjuryAlert
+    var onSell: () -> Void
+    var onDismiss: () -> Void
+
+    private var day: String {
+        AutoRules.berlin.component(.hour, from: Date()) < AutoRules.marketValueUpdateHour ? "heute" : "morgen"
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "cross.case.fill").foregroundColor(.red)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(alert.player.fullName) (\(alert.player.positionName)) ist als verletzt gemeldet")
+                    .font(.callout.weight(.semibold))
+                Text("Verletzte Spieler verlieren meist an Wert. Bis \(day) 22:00 Uhr bringt ein Verkauf an Kickbase noch ca. \(Fmt.eur(alert.proceeds)).")
+                    .font(.caption).foregroundColor(.secondary)
+                if alert.inCore {
+                    Text("Gehört zu deinen Top 11 (Ø-Punkte).").font(.caption).foregroundColor(.orange)
+                }
+                if !alert.sellable {
+                    Text("Verkauf nicht möglich: \(alert.reason).").font(.caption).foregroundColor(.red)
+                }
+            }
+            Spacer()
+            if alert.sellable {
+                Button("Verkaufen …", action: onSell)
+            }
+            Button("Behalten", action: onDismiss)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.08)))
     }
 }
 

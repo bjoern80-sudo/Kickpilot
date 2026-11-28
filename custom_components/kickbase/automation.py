@@ -29,6 +29,7 @@ from .const import (
     MODE_SEMI,
     OPT_CONFIRM_VALID_HOURS,
     OPT_DRY_RUN,
+    OPT_INJURY_WARN,
     OPT_LINEUP_LEAD_HOURS,
     OPT_LINEUP_WARN,
     OPT_FULL_AUTO_ACK,
@@ -41,7 +42,7 @@ from .const import (
     opt,
 )
 from .coordinator import KickbaseCoordinator
-from .planner import next_deadline
+from .planner import AutoRules, InjuryAlert, injured_ids, injury_alerts, next_deadline
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ ACTION_CONFIRM = "KICKBASE_CONFIRM_"
 ACTION_REJECT = "KICKBASE_REJECT_"
 KIND_BUYS = "kaeufe"
 KIND_SALES = "verkaeufe"
+KIND_INJURY = "verletzung"  # sale of a newly injured player – ALWAYS needs confirmation
 MAX_ERRORS_IN_A_ROW = 2
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
@@ -199,6 +201,69 @@ class KickbaseAutomation:
             self.entry.async_create_background_task(
                 self.hass, self._notify("Kickbase: Ausgleich nötig", text), f"{DOMAIN}_deadline"
             )
+
+    @callback
+    def async_check_injuries(self) -> None:
+        """Coordinator listener: an own player was newly reported injured → push with sale proposal.
+
+        Never sells on its own – the sale needs a tap on „Verkaufen bestätigen“ (also in full automation).
+        """
+        data = self.coordinator.data
+        if data is None or not data.squad or not self.coordinator.last_update_success:
+            return
+        current = injured_ids(data.squad)
+        if "injured" not in self._state:
+            # First run: remember who is injured already, no warning for old injuries.
+            self._state["injured"] = sorted(current)
+            self.entry.async_create_background_task(self.hass, self._save(), f"{DOMAIN}_injury_init")
+            return
+        known = set(self._state["injured"])
+        alerts = injury_alerts(data.squad, known)
+        if current != known:
+            # Healed players drop out, so a new injury later warns again.
+            self._state["injured"] = sorted(current)
+            self.entry.async_create_background_task(self.hass, self._save(), f"{DOMAIN}_injury_save")
+        if not alerts or not self.enabled or not opt(self.options, OPT_INJURY_WARN):
+            return
+        for alert in alerts:
+            self.entry.async_create_background_task(
+                self.hass, self._send_injury(alert), f"{DOMAIN}_injury_{alert.player.id}"
+            )
+
+    async def _send_injury(self, alert: InjuryAlert) -> None:
+        p = alert.player
+        now = dt_util.now()
+        day = "heute" if now.hour < AutoRules.market_value_update_hour else "morgen"
+        lines = [f"{p.full_name} ({p.position_name}) ist als verletzt gemeldet."]
+        if p.gain_since_purchase is not None:
+            lines.append(f"Marktwert {eur(p.market_value)} ({'+' if p.gain_since_purchase >= 0 else ''}{eur(p.gain_since_purchase)} seit Kauf).")
+        else:
+            lines.append(f"Marktwert {eur(p.market_value)}.")
+        lines.append(
+            f"Verletzte Spieler verlieren meist an Wert. Bis {day} 22:00 Uhr bringt ein Verkauf an "
+            f"Kickbase noch ca. {eur(alert.proceeds)}."
+        )
+        if alert.in_core:
+            lines.append("Achtung: gehört zu deinen Top 11 (Ø-Punkte).")
+        if not alert.sellable:
+            lines.append(f"Verkauf nicht möglich: {alert.reason}.")
+            await self._notify("Kickbase: Spieler verletzt", "\n".join(lines))
+            return
+        order = Order(self._token(), KIND_INJURY, [OrderItem(p.id, p.full_name, alert.proceeds)])
+        self._orders[order.token] = order
+        valid = opt(self.options, OPT_CONFIRM_VALID_HOURS)
+        if opt(self.options, OPT_DRY_RUN):
+            lines.append("Trockenlauf: es wird nichts ausgeführt.")
+        lines.append(f"Gültig {valid} h.")
+        await self._notify(
+            f"Kickbase: {p.full_name} verletzt – verkaufen?",
+            "\n".join(lines),
+            actions=[
+                {"action": ACTION_CONFIRM + order.token, "title": "Verkaufen bestätigen"},
+                {"action": ACTION_REJECT + order.token, "title": "Behalten"},
+            ],
+            token=order.token,
+        )
 
     @callback
     def async_check_lineup(self) -> None:
@@ -383,6 +448,34 @@ class KickbaseAutomation:
                     done_amount += item.amount
                     done_count += 1
                     log.append(f"✓ Gebot {eur(item.amount)} für {item.name}")
+        elif order.kind == KIND_INJURY:
+            squad = {p.id: p for p in data.squad}
+            for item in order.items:
+                player = squad.get(item.player_id)
+                if player is None:
+                    log.append(f"– {item.name}: nicht mehr im Kader, übersprungen")
+                    continue
+                check = injury_alerts(data.squad, set())
+                alert = next((a for a in check if a.player.id == item.player_id), None)
+                if alert is None:
+                    log.append(f"– {item.name}: nicht mehr als verletzt gemeldet, übersprungen")
+                    continue
+                if not alert.sellable:
+                    log.append(f"– {item.name}: {alert.reason}, übersprungen")
+                    continue
+                if dry:
+                    log.append(f"✓ {prefix}{item.name} für ca. {eur(player.market_value)} an Kickbase verkaufen")
+                    continue
+                try:
+                    if not player.on_market:
+                        await api.list_for_sale(league, item.player_id, int(round(player.market_value)))
+                    await api.sell_to_kickbase(league, item.player_id)
+                except KickbaseError as err:
+                    errors += 1
+                    log.append(f"✗ {item.name}: {err}")
+                else:
+                    done_count += 1
+                    log.append(f"✓ {item.name} an Kickbase verkauft")
         else:
             current_sales = {s.player.id: s for s in plan.sales}
             squad = {p.id: p for p in data.squad}
@@ -408,7 +501,7 @@ class KickbaseAutomation:
                     done_count += 1
                     log.append(f"✓ {item.name} an Kickbase verkauft")
 
-        if not dry:
+        if not dry and order.kind != KIND_INJURY:  # injury sales do not count against Friday limits
             await self._book(order.kind, done_count, done_amount)
         await self._track_errors(errors, source)
 

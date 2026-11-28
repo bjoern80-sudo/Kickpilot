@@ -624,3 +624,44 @@ def sale_proposals(
         result.append(SaleProposal(p, proceeds, g[0], g[1]))
         balance += proceeds
     return result
+
+
+# ---- injury warning -------------------------------------------------------------
+# Same as InjuryAlert in AutoTransfer.swift. Kickbase updates market values at 22:00;
+# an injured player usually loses value from the next update on, so selling before
+# 22:00 still brings today's market value (100 % on a sale to Kickbase).
+
+INJURED_STATUS = 1  # `st` 1 = verletzt
+
+
+@dataclass
+class InjuryAlert:
+    player: Player
+    proceeds: float
+    sellable: bool
+    reason: str  # why a sale is not possible, otherwise ""
+    in_core: bool  # among the best 11 by Ø points
+
+
+def injury_alerts(squad: list[Player], known_injured: set[str]) -> list[InjuryAlert]:
+    """Own players newly reported injured since the last check (`known_injured`)."""
+    by_avg = sorted(squad, key=lambda p: p.average_points, reverse=True)
+    core = {p.id for p in by_avg[: AutoRules.keep_core]}
+    per_position: dict[int, int] = {}
+    for p in squad:
+        per_position[p.position] = per_position.get(p.position, 0) + 1
+    result: list[InjuryAlert] = []
+    for p in by_avg:
+        if p.status != INJURED_STATUS or p.id in known_injured:
+            continue
+        minimum = AutoRules.min_per_position.get(p.position, 0)
+        sellable = per_position.get(p.position, 0) > minimum
+        reason = "" if sellable else f"Mindestbesetzung ({minimum} {p.position_name})"
+        result.append(
+            InjuryAlert(p, p.market_value * AutoRules.kickbase_sale_factor, sellable, reason, p.id in core)
+        )
+    return result
+
+
+def injured_ids(squad: list[Player]) -> set[str]:
+    return {p.id for p in squad if p.status == INJURED_STATUS}

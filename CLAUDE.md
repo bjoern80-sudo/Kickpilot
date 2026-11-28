@@ -89,6 +89,13 @@ Bundesliga-Fantasy-Spiel Kickbase. Die API-Logik stammt aus behretv/kickbase-mcp
   des betroffenen Spielers (nur bei „Automatik aktiv“); Spielplan wird alle 3 h geladen.
   Mac-App: Hinweis in der Team-Ansicht + Badge in der Seitenleiste.
 
+## Verletzungs-Warnung (`InjuryAlert` in `AutoTransfer.swift`, `injury_alerts` in `planner.py` – 1:1)
+- Auslöser: eigener Spieler wechselt auf `st` 1 (verletzt). Bekannte Verletzte merkt sich HA im Store
+  (`injured`), die Mac-App in UserDefaults (`knownInjured.<liga>`); erster Lauf warnt nicht.
+- Verkaufsvorschlag (100 % MW an Kickbase), Hinweis auf das MW-Update um 22:00. Nicht verkaufbar, wenn die
+  Mindestbesetzung (`minPerPosition`) unterschritten würde. Verkauf IMMER nur nach Bestätigung (Push-Button
+  bzw. Dialog), auch bei Vollautomatik; zählt nicht zum Freitags-Verkaufslimit. Option `injury_warn`.
+
 ## Home-Assistant-Integration (`custom_components/kickbase/`)
 - Python-Port für Home Assistant, Plan in `docs/home-assistant-plan.md`.
 - `planner.py` ist eine 1:1-Übertragung von `AutoTransfer.swift`: Regeländerungen immer in BEIDEN

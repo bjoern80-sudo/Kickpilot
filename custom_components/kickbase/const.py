@@ -25,6 +25,7 @@ OPT_DRY_RUN = "dry_run"
 OPT_DESIGN = "design"  # DESIGN_APP | DESIGN_HA (look of the Kickpilot card)
 OPT_LINEUP_WARN = "lineup_warn"  # warn before kick-off if the starting eleven has problems
 OPT_LINEUP_LEAD_HOURS = "lineup_lead_hours"
+OPT_INJURY_WARN = "injury_warn"  # push + sale proposal when an own player is reported injured
 
 MODE_SEMI = "semi"
 MODE_FULL = "full"
@@ -50,6 +51,7 @@ DEFAULT_OPTIONS: dict = {
     OPT_DESIGN: DESIGN_APP,
     OPT_LINEUP_WARN: True,
     OPT_LINEUP_LEAD_HOURS: 2,
+    OPT_INJURY_WARN: True,
 }
 
 MIN_SCAN_INTERVAL = 5
