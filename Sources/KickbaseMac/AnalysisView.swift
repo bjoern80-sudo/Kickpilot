@@ -21,10 +21,8 @@ struct AnalysisView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Kader-Vergleich").font(.headline)
-                Spacer()
+        Page(title: "Kader-Analyse", subtitle: "Kader der Liga vergleichen und einzeln ansehen", scrolls: true) {
+            Card(title: "Kader-Vergleich", padding: 14) {
                 if loadingAll { ProgressView().controlSize(.small) }
                 Button {
                     Task {
@@ -36,8 +34,7 @@ struct AnalysisView: View {
                     Label("Alle Kader laden", systemImage: "arrow.down.circle")
                 }
                 .disabled(loadingAll)
-            }
-
+            } content: {
             if summaries.isEmpty {
                 Text("Lade alle Kader, um die Teams der Liga zu vergleichen – oder wähle unten einen Manager.")
                     .foregroundColor(.secondary)
@@ -54,7 +51,7 @@ struct AnalysisView: View {
                     TableColumn("Punkte Kader") { s in Text(Fmt.int(s.totalPoints)).monospacedDigit() }
                     TableColumn("24h") { s in TrendText(value: s.trend24h) }
                     TableColumn("Ausfälle") { s in
-                        Text("\(s.unavailable)").foregroundColor(s.unavailable > 0 ? .red : .primary)
+                        Text("\(s.unavailable)").foregroundColor(s.unavailable > 0 ? .loss : .primary)
                     }
                     .width(60)
                     TableColumn("Auf Markt") { s in Text("\(s.onMarket)") }
@@ -65,8 +62,9 @@ struct AnalysisView: View {
                             HStack(spacing: 4) {
                                 TrendText(value: t.balance)
                                 if t.isHot {
-                                    Image(systemName: "flame.fill").foregroundColor(.orange)
+                                    Image(systemName: "flame.fill").foregroundColor(.warn)
                                         .help("In den letzten 24 h besonders aktiv")
+                                        .accessibilityLabel("In den letzten 24 h besonders aktiv")
                                 }
                             }
                         } else {
@@ -74,10 +72,10 @@ struct AnalysisView: View {
                         }
                     }
                 }
-                .frame(height: min(CGFloat(summaries.count) * 26 + 34, 280))
+                .fittedTableHeight(rows: summaries.count, max: 280)
+                .scrollContentBackground(.hidden)
             }
-
-            Divider()
+            }
 
             Picker("Kader von", selection: $selectedManagerId) {
                 Text("Manager wählen …").tag(String?.none)
@@ -91,16 +89,18 @@ struct AnalysisView: View {
                 if let squad = state.managerSquads[id] {
                     transferSection(for: id)
                     ManagerInsights(squad: squad)
-                    PlayerTable(players: squad, sortOrder: $sortOrder) { detailPlayer = $0 }
+                    Card(title: "Kader", detail: "\(squad.count) Spieler", padding: 0) {
+                        PlayerTable(players: squad, sortOrder: $sortOrder) { detailPlayer = $0 }
+                            .fittedTableHeight(rows: squad.count)
+                            .scrollContentBackground(.hidden)
+                    }
                 } else {
                     ProgressView("Lade Kader …")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
                 }
-            } else {
-                Spacer()
             }
         }
-        .padding()
         .task(id: selectedManagerId) {
             if selectedManagerId != nil, state.transfersLoadedAt == nil {
                 await state.loadTransfers()

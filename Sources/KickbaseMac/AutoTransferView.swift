@@ -18,8 +18,11 @@ struct AutoTransferView: View {
     private var plan: AutoPlan? { state.autoPlan }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+        Page(title: "Automatik",
+             subtitle: "Vorschläge bis zum Stichtag \(Fmt.deadline(plan?.deadline ?? AutoRules.nextDeadline())) – nichts passiert ohne deine Bestätigung",
+             scrolls: true) {
+            headerControls
+        } content: {
                 header
                 DeadlineBanner(budget: state.budget, plan: plan)
                 if let plan {
@@ -38,8 +41,6 @@ struct AutoTransferView: View {
                 if !log.isEmpty {
                     InsightBox(title: "Protokoll", lines: log)
                 }
-            }
-            .padding()
         }
         .task {
             if state.autoPlan == nil { await state.buildAutoPlan() }
@@ -87,13 +88,8 @@ struct AutoTransferView: View {
 
     // MARK: Header
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Transfer-Automatik").font(.headline)
-                Text("Stichtag \(Fmt.deadline(plan?.deadline ?? AutoRules.nextDeadline()))")
-                    .foregroundColor(.secondary)
-                Spacer()
+    private var headerControls: some View {
+            HStack(spacing: 12) {
                 if state.autoLoading {
                     ProgressView().controlSize(.small)
                     Text(state.autoStatus).font(.caption).foregroundColor(.secondary)
@@ -105,20 +101,23 @@ struct AutoTransferView: View {
                 } label: {
                     Label("Plan berechnen", systemImage: "wand.and.stars")
                 }
+                .buttonStyle(.borderedProminent)
                 .disabled(state.autoLoading || executing)
             }
-            HStack(spacing: 10) {
-                StatCard(title: "Budget", value: Fmt.eur(state.budget), color: state.budget < 0 ? .red : nil)
-                StatCard(title: "Freitags verkaufbar (ohne Top-\(AutoRules.keepCore))",
-                         value: Fmt.eur(plan?.reserve ?? 0))
-                StatCard(title: "Offene Gebote", value: Fmt.eur(plan?.openBids ?? 0))
-                StatCard(title: "Rahmen bis Freitag 20:30 Uhr", value: Fmt.eur(plan?.bidLimit ?? 0))
-                StatCard(title: "Gesamtrahmen (bis −\(Int(AutoRules.maxDebtShareOfTeamValue * 100)) % Teamwert)",
-                         value: Fmt.eur(plan?.globalLimit ?? 0))
+    }
+
+    private var header: some View {
+            HStack(spacing: Theme.gap) {
+                StatCard(title: "Budget", value: Fmt.eur(state.budget), color: state.budget < 0 ? .loss : nil,
+                         icon: "eurosign.circle")
+                StatCard(title: "Gebotsrahmen bis Freitag", value: Fmt.eur(plan?.bidLimit ?? 0), icon: "hand.raised")
+                    .help("Budget minus offene Gebote plus der Marktwert aller Spieler außerhalb deiner Top \(AutoRules.keepCore) (Freitags verkaufbar: \(Fmt.eur(plan?.reserve ?? 0))).")
+                StatCard(title: "Gesamtrahmen", value: Fmt.eur(plan?.globalLimit ?? 0), icon: "gauge.with.dots.needle.33percent")
+                    .help("Alle Gebote zusammen: Budget darf höchstens auf −\(Int(AutoRules.maxDebtShareOfTeamValue * 100)) % des Teamwerts fallen.")
+                StatCard(title: "Offene Gebote", value: Fmt.eur(plan?.openBids ?? 0), icon: "clock")
                 StatCard(title: "Kader", value: "\(state.squad.count) / \(AutoRules.maxSquadSize)",
-                         color: state.squad.count >= AutoRules.maxSquadSize ? .orange : nil)
+                         color: state.squad.count >= AutoRules.maxSquadSize ? .warn : nil, icon: "person.3")
             }
-        }
     }
 
     // MARK: Buys
@@ -136,39 +135,36 @@ struct AutoTransferView: View {
 
     @ViewBuilder
     private func buySection(_ plan: AutoPlan) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Gebotsvorschläge").font(.headline)
-                Text("stabil steigend oder Trendumkehr nach Boden, noch unter dem letzten Hochpunkt, Gewinn ≥ \(Fmt.eur(AutoRules.minProfit)) bzw. \(Int(AutoRules.minProfitPct)) % · Gebot knapp über \(plan.competitorName) (\(Fmt.pct(plan.competitorPct, signed: true)))")
-                    .font(.caption).foregroundColor(.secondary)
-                Spacer()
+        Card(title: "Gebotsvorschläge",
+             detail: plan.buys.isEmpty ? nil : "\(plan.buys.count)",
+             info: "Spieler mit stabilem Anstieg (4 von 5 Tagen) oder Trendumkehr nach einem Boden, noch unter dem letzten Hochpunkt, mit erwartetem Gewinn nach \(Int(AutoRules.holdDays)) Tagen von mindestens \(Fmt.eur(AutoRules.minProfit)) bzw. \(Int(AutoRules.minProfitPct)) %. Gebot knapp über dem üblichen Aufpreis von \(plan.competitorName) (\(Fmt.pct(plan.competitorPct, signed: true))). Vorschläge erscheinen erst am Ablauftag des Angebots.") {
                 Button("Ausgewählte Gebote abgeben …") { confirmBuys = true }
+                    .buttonStyle(.borderedProminent)
                     .disabled(chosenBuys.isEmpty || executing)
-            }
+        } content: {
             BacktestBox(result: plan.backtest)
             if plan.buys.isEmpty {
                 Text("Aktuell kein Spieler, bei dem sich ein Gebot lohnt.").foregroundColor(.secondary)
             } else {
                 Table(plan.buys) {
                     TableColumn("") { b in
-                        Toggle("", isOn: binding(b.id, in: $selectedBuys)).labelsHidden()
+                        Toggle("\(b.player.fullName) auswählen", isOn: binding(b.id, in: $selectedBuys)).labelsHidden()
                     }
                     .width(24)
                     TableColumn("Spieler") { b in
                         HStack(spacing: 4) {
                             PlayerNameCell(player: b.player)
-                            Text(b.trend.pattern.rawValue).font(.caption2)
-                                .padding(.horizontal, 4)
-                                .background((b.trend.pattern == .reversal ? Color.purple : Color.green).opacity(0.15),
-                                            in: RoundedRectangle(cornerRadius: 4))
-                                .help(b.trend.pattern == .reversal
+                            Badge(text: b.trend.pattern.short,
+                                  color: b.trend.pattern == .reversal ? .reversal : .gain,
+                                  help: b.trend.pattern.rawValue + ": " + (b.trend.pattern == .reversal
                                       ? "Boden bei \(b.trend.trough.map(Fmt.eur) ?? "–") nach \(b.trend.dropBeforeTroughPct.map { Fmt.pct($0) } ?? "–") Rückgang"
-                                      : "\(b.trend.risingDays) von 5 Tagen gestiegen")
+                                      : "\(b.trend.risingDays) von 5 Tagen gestiegen"))
                         }
                     }
+                    .width(min: 230, ideal: 260)
                     TableColumn("Marktwert") { b in Text(Fmt.eur(b.player.marketValue)).monospacedDigit() }
                     TableColumn("Zuwachs \(Int(AutoRules.momentumDays)) T") { b in
-                        Text(Fmt.pct(b.momentumPct, signed: true)).monospacedDigit().foregroundColor(.green)
+                        Text(Fmt.pct(b.momentumPct, signed: true)).monospacedDigit().foregroundColor(.gain)
                     }
                     TableColumn("Gebot") { b in Text(Fmt.eur(b.bid)).monospacedDigit().fontWeight(.semibold) }
                     TableColumn("über MW") { b in Text(Fmt.pct(b.bidOverMVPct, signed: true)).monospacedDigit() }
@@ -188,16 +184,15 @@ struct AutoTransferView: View {
                         HStack(spacing: 4) {
                             Text(Fmt.remaining(b.player.expiresAt))
                             if b.afterDeadline {
-                                Text("nach Stichtag").font(.caption2)
-                                    .padding(.horizontal, 4)
-                                    .background(Color.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
-                                    .help("Endet nach Freitag 20:30 Uhr – zählt erst für die nächste Woche")
+                                Badge(text: "nach Stichtag", color: .info,
+                                      help: "Endet nach Freitag 20:30 Uhr – zählt erst für die nächste Woche")
                             }
                         }
                     }
                     TableColumn("Erw. Gewinn") { b in TrendText(value: b.expectedGain) }
                 }
-                .frame(height: CGFloat(plan.buys.count) * 26 + 34)
+                .fittedTableHeight(rows: plan.buys.count)
+                .scrollContentBackground(.hidden)
                 Text("Summe ausgewählt: \(Fmt.eur(chosenBuys.reduce(0) { $0 + $1.bid })) · bis Freitag: \(Fmt.eur(plan.bidLimit)) · gesamt: \(Fmt.eur(plan.globalLimit))")
                     .font(.caption).foregroundColor(.secondary)
             }
@@ -219,42 +214,40 @@ struct AutoTransferView: View {
 
     @ViewBuilder
     private func saleSection(_ plan: AutoPlan) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Freitags-Ausgleich").font(.headline)
-                Text("schwächste Spieler mit dem besten Wertzuwachs, sofort an Kickbase · bleibt immer: mind. 1 TW, 3 ABW, 1 ST")
-                    .font(.caption).foregroundColor(.secondary)
-                Spacer()
+        Card(title: "Freitags-Ausgleich",
+             info: "Damit das Budget am Freitag um 20:30 Uhr mindestens 0 ist: zuerst die schwächsten Spieler (Ø-Punkte) mit dem besten Wertzuwachs, die Top 11 zuletzt. Verkauf sofort an Kickbase zu 100 % des Marktwerts. Im Kader bleiben immer mindestens 1 TW, 3 ABW und 1 ST.") {
                 Button("Ausgewählte an Kickbase verkaufen …") { confirmSales = true }
                     .disabled(chosenSales.isEmpty || executing)
-            }
+        } content: {
             if plan.sales.isEmpty {
                 Label("Budget ist ausgeglichen – kein Verkauf nötig.", systemImage: "checkmark.circle")
-                    .foregroundColor(.green)
+                    .foregroundColor(.gain)
             } else {
                 Table(plan.sales) {
                     TableColumn("") { s in
-                        Toggle("", isOn: binding(s.id, in: $selectedSales)).labelsHidden()
+                        Toggle("\(s.player.fullName) auswählen", isOn: binding(s.id, in: $selectedSales)).labelsHidden()
                     }
                     .width(24)
                     TableColumn("Spieler") { s in PlayerNameCell(player: s.player) }
+                        .width(min: 180, ideal: 220)
                     TableColumn("Ø Punkte") { s in Text(Fmt.int(s.player.averagePoints)).monospacedDigit() }
                     TableColumn("Wertzuwachs") { s in
                         HStack(spacing: 4) {
                             Text(Fmt.pct(s.gainPct, signed: true)).monospacedDigit()
-                                .foregroundColor(s.gainPct >= 0 ? .green : .red)
+                                .foregroundColor(s.gainPct >= 0 ? .gain : .loss)
                             Text(s.gainBasis).font(.caption).foregroundColor(.secondary)
                         }
                     }
                     TableColumn("Marktwert") { s in Text(Fmt.eur(s.player.marketValue)).monospacedDigit() }
                     TableColumn("Erlös ca.") { s in Text(Fmt.eur(s.expectedProceeds)).monospacedDigit() }
                 }
-                .frame(height: CGFloat(plan.sales.count) * 26 + 34)
+                .fittedTableHeight(rows: plan.sales.count)
+                .scrollContentBackground(.hidden)
                 saleImpact(plan)
                 if plan.budgetAfterSales < 0 {
                     Label("Selbst mit allen erlaubten Verkäufen bleibt das Budget bei ca. \(Fmt.eur(plan.budgetAfterSales)). Mindestbesetzung (1 TW, 3 ABW, 1 ST) wird nicht unterschritten.",
                           systemImage: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
+                        .foregroundColor(.loss)
                 }
                 Text("Budget danach ca. \(Fmt.eur(plan.budgetAfterSales))\(plan.openBids > 0 ? ", falls deine offenen Gebote (\(Fmt.eur(plan.openBids))) gewinnen" : "") (Verkauf an Kickbase zum vollen Marktwert)")
                     .font(.caption).foregroundColor(.secondary)
@@ -266,7 +259,9 @@ struct AutoTransferView: View {
     // MARK: Upgrades (points forecast) and sell signals
 
     private var upgradeSection: some View {
-        GroupBox {
+        Card(title: "Verstärkungen für die Startelf",
+             detail: state.forecastMatchday.map { "\($0). Spieltag" },
+             info: "Prognose: ½ Saison-Ø + ½ Ø der letzten 4 Spieltage × Einsatzquote, angepasst an den Gegner (±20 %) und Heim/Auswärts (±5 %). Vorgeschlagen werden Marktspieler mit heutigem Ablauf, die mindestens \(Int(ForecastRules.upgradeMinGain)) Punkte mehr bringen als dein schwächster Starter derselben Position.") {
             VStack(alignment: .leading, spacing: 6) {
                 if state.upgrades.isEmpty {
                     Text("Kein Marktspieler mit heutigem Ablauf bringt laut Prognose mindestens \(Int(ForecastRules.upgradeMinGain)) Punkte mehr als dein schwächster Starter.")
@@ -284,12 +279,8 @@ struct AutoTransferView: View {
                         Button("Bieten …") { confirmUpgrade = u }.disabled(executing)
                     }
                 }
-                Text("Prognose: ½ Saison-Ø + ½ Ø der letzten 4 Spieltage × Einsatzquote, Gegner (±20 %), Heim/Auswärts (±5 %).")
-                    .font(.caption2).foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-            Text("Verstärkungen für die Startelf\(state.forecastMatchday.map { " · \($0). Spieltag" } ?? "")").font(.headline)
         }
         .confirmationDialog(
             "\(Fmt.eur(confirmUpgrade?.bid ?? 0)) auf \(confirmUpgrade?.player.fullName ?? "") bieten?",
@@ -314,7 +305,8 @@ struct AutoTransferView: View {
     }
 
     private var trendSection: some View {
-        GroupBox {
+        Card(title: "Verkaufssignale",
+             info: "Spieler außerhalb deiner Top 11, deren Marktwert seit 2 Tagen fällt und mindestens 3 % unter dem Hoch der letzten 14 Tage liegt. Verkauf an Kickbase bringt 100 % des aktuellen Marktwerts.") {
             VStack(alignment: .leading, spacing: 6) {
                 if state.trendSales.isEmpty {
                     Text("Kein Spieler außerhalb deiner Top 11 verliert gerade deutlich an Wert.")
@@ -334,8 +326,6 @@ struct AutoTransferView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-            Text("Verkaufssignale (fallender Marktwert)").font(.headline)
         }
         .confirmationDialog(
             "\(confirmTrend?.player.fullName ?? "") an Kickbase verkaufen?",
@@ -364,15 +354,13 @@ struct AutoTransferView: View {
                     Text("– es fehlen noch \(Fmt.eur(-withSelection))")
                 }
             }
-            .foregroundColor(withSelection >= 0 ? .green : .red)
+            .foregroundColor(withSelection >= 0 ? .gain : .loss)
             ForEach(kept) { s in
                 Text("Ohne Verkauf von \(s.player.fullName): \(Fmt.signedEur(-s.expectedProceeds)) Budget")
                     .font(.callout).monospacedDigit().foregroundColor(.secondary)
             }
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .bannerSurface(withSelection >= 0 ? .gain : .loss)
     }
 
     // MARK: Open bids
@@ -381,12 +369,9 @@ struct AutoTransferView: View {
     private func openBidSection(_ plan: AutoPlan) -> some View {
         let bids = state.market.filter { $0.myOfferPrice != nil }
             .sorted { ($0.expiresAt ?? .distantFuture) < ($1.expiresAt ?? .distantFuture) }
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Deine offenen Gebote").font(.headline)
-                Text("Einschätzung gegen das erwartete Höchstgebot von \(plan.competitorName) (\(Fmt.pct(plan.competitorPct, signed: true)) über MW)")
-                    .font(.caption).foregroundColor(.secondary)
-            }
+        Card(title: "Deine offenen Gebote",
+             detail: bids.isEmpty ? nil : "\(bids.count)",
+             info: "Einschätzung gegen das erwartete Höchstgebot von \(plan.competitorName) (\(Fmt.pct(plan.competitorPct, signed: true)) über dem Marktwert).") {
             if bids.isEmpty {
                 Text("Du hast aktuell keine offenen Gebote.").foregroundColor(.secondary)
             } else {
@@ -398,6 +383,7 @@ struct AutoTransferView: View {
                     }
                     .width(110)
                     TableColumn("Spieler") { p in PlayerNameCell(player: p) }
+                        .width(min: 180, ideal: 220)
                     TableColumn("Marktwert") { p in Text(Fmt.eur(p.marketValue)).monospacedDigit() }
                     TableColumn("Angebotspreis") { p in Text(Fmt.eur(p.effectivePrice)).monospacedDigit() }
                     TableColumn("Dein Gebot") { p in
@@ -411,23 +397,23 @@ struct AutoTransferView: View {
                         let mine = p.myOfferPrice ?? 0
                         let rec = plan.recommendedBid(for: p)
                         if mine >= rec {
-                            Label("reicht vermutlich", systemImage: "checkmark.circle").foregroundColor(.green)
+                            Label("reicht vermutlich", systemImage: "checkmark.circle").foregroundColor(.gain)
                         } else {
-                            Text("zu niedrig, empf. \(Fmt.mio(rec))").foregroundColor(.orange).help("Empfohlenes Gebot: \(Fmt.eur(rec))")
+                            Text("zu niedrig, empf. \(Fmt.mio(rec))").foregroundColor(.warn).help("Empfohlenes Gebot: \(Fmt.eur(rec))")
                         }
                     }
                     TableColumn("Endet") { p in
                         HStack(spacing: 4) {
                             Text(Fmt.remaining(p.expiresAt))
                             if (p.expiresAt ?? .distantFuture) > plan.deadline {
-                                Text("nach Stichtag").font(.caption2)
-                                    .padding(.horizontal, 4)
-                                    .background(Color.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                                Badge(text: "nach Stichtag", color: .info,
+                                      help: "Endet nach Freitag 20:30 Uhr – zählt erst für die nächste Woche")
                             }
                         }
                     }
                 }
-                .frame(height: CGFloat(bids.count) * 26 + 34)
+                .fittedTableHeight(rows: bids.count)
+                .scrollContentBackground(.hidden)
                 Text("Summe: \(Fmt.eur(plan.allOpenBids)) · davon vor dem Stichtag fällig: \(Fmt.eur(plan.openBids))")
                     .font(.caption).foregroundColor(.secondary)
             }
@@ -437,10 +423,8 @@ struct AutoTransferView: View {
     // MARK: Profiles
 
     private var profileSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Bieterprofile").font(.headline)
-            Text("Aufpreis gegenüber dem Marktwert am Kauftag, aus den geladenen Transfers")
-                .font(.caption).foregroundColor(.secondary)
+        Card(title: "Bieterprofile",
+             info: "Aufpreis gegenüber dem Marktwert am Kauftag, ausgewertet aus den geladenen Transfers. Daraus ergibt sich der stärkste Konkurrent und dein empfohlenes Gebot.") {
             Table(state.bidderProfiles) {
                 TableColumn("Manager") { p in
                     Text(p.id == state.myUserId ? "\(p.name) (du)" : p.name)
@@ -453,7 +437,8 @@ struct AutoTransferView: View {
                 TableColumn("Maximum") { p in OverpayText(value: p.maxOverpay) }
                 TableColumn("Käufe/Woche") { p in Text(Fmt.dec(p.buysPerWeek)).monospacedDigit() }
             }
-            .frame(height: CGFloat(state.bidderProfiles.count) * 26 + 34)
+            .fittedTableHeight(rows: state.bidderProfiles.count)
+            .scrollContentBackground(.hidden)
         }
     }
 
@@ -499,9 +484,7 @@ struct BacktestBox: View {
                 }
             }
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .bannerSurface(.info)
     }
 }
 
@@ -511,7 +494,7 @@ extension BacktestBox {
         if s.signals > 0 {
             Text("\(title): \(s.signals) × · mit Gewinn \(Fmt.pct(s.hitRate)) · Ø \(Fmt.pct(s.avgProfitPct, signed: true)) · Ziel erreicht \(Fmt.pct(s.targetRate))")
                 .font(.callout).monospacedDigit()
-                .foregroundColor(s.avgProfitPct > 0 ? .green : .red)
+                .foregroundColor(s.avgProfitPct > 0 ? .gain : .loss)
         } else {
             Text("\(title): keine Signale").font(.callout).foregroundColor(.secondary)
         }
@@ -535,10 +518,13 @@ struct DeadlineBanner: View {
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill")
             }
-            .foregroundColor(urgent ? .white : .primary)
-            .padding(10)
+            .font(.callout.weight(.semibold))
+            .foregroundColor(urgent ? .white : .warn)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background((urgent ? Color.red : Color.orange.opacity(0.18)), in: RoundedRectangle(cornerRadius: 8))
+            .background((urgent ? Color.loss : Color.warn.opacity(Theme.subtleFill)),
+                        in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         }
     }
 }

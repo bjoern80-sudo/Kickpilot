@@ -52,7 +52,7 @@ struct TransfersView: View {
 
     var body: some View {
         let stats = state.transferStats(period: period)
-        VStack(alignment: .leading, spacing: 12) {
+        Page(title: "Transfers", subtitle: "Alle Transfers der Liga – \(periodLabel)") {
             filterBar
 
             ActivityHints(stats: stats)
@@ -68,12 +68,15 @@ struct TransfersView: View {
                 if let id = managerFilter, let s = stats.first(where: { $0.id == id }) {
                     ManagerTransferPanel(stats: s, periodLabel: periodLabel)
                 } else {
-                    statsTable(stats)
+                    Card(title: "Manager", detail: "Doppelklick filtert die Transfers", padding: 0) {
+                        statsTable(stats).scrollContentBackground(.hidden)
+                    }
                 }
-                transferTable
+                Card(title: "Transfers", padding: 0) {
+                    transferTable.scrollContentBackground(.hidden)
+                }
             }
         }
-        .padding()
         .task(id: state.currentLeague?.id) {
             if state.transfersLoadedAt == nil { await state.loadTransfers() }
         }
@@ -113,7 +116,7 @@ struct TransfersView: View {
             .frame(width: 240)
             Spacer()
             if state.transfersLoading { ProgressView().controlSize(.small) }
-            Text("\(filteredTransfers.count) Transfers · Doppelklick = Spielerdetails")
+            Text("\(filteredTransfers.count) Transfers")
                 .foregroundColor(.secondary)
             if period == .all && state.transfersHaveMore {
                 Button("Ältere laden") { Task { await state.loadOlderTransfers() } }
@@ -136,8 +139,9 @@ struct TransfersView: View {
                 HStack(spacing: 4) {
                     Text(s.isMe ? "\(s.name) (du)" : s.name).fontWeight(s.isMe ? .bold : .regular)
                     if s.isHot {
-                        Image(systemName: "flame.fill").foregroundColor(.orange)
+                        Image(systemName: "flame.fill").foregroundColor(.warn)
                             .help("In den letzten 24 h besonders aktiv")
+                            .accessibilityLabel("In den letzten 24 h besonders aktiv")
                     }
                 }
             }
@@ -156,7 +160,7 @@ struct TransfersView: View {
         } primaryAction: { ids in
             if let id = ids.first { managerFilter = id }
         }
-        .frame(height: min(CGFloat(stats.count) * 26 + 34, 240))
+        .fittedTableHeight(rows: stats.count, max: 240)
     }
 
     private var transferTable: some View {
@@ -167,8 +171,8 @@ struct TransfersView: View {
             .width(min: 110, ideal: 120)
             TableColumn("Spieler", value: \.playerName) { r in
                 HStack(spacing: 4) {
+                    ClubCrest(club: .named(r.team), size: 14)
                     Text(r.playerName)
-                    Text(r.team).font(.caption).foregroundColor(.secondary)
                 }
             }
             TableColumn("Käufer", value: \.buyer) { r in PartyText(name: r.buyer) }
@@ -181,7 +185,7 @@ struct TransfersView: View {
             TableColumn("Preis/MW", value: \.ratioSortKey) { r in
                 if let ratio = r.ratio {
                     Text(Fmt.pct(ratio)).monospacedDigit()
-                        .foregroundColor(ratio > 100 ? .orange : (ratio < 100 ? .green : .primary))
+                        .foregroundColor(ratio > 100 ? .warn : (ratio < 100 ? .gain : .primary))
                 } else {
                     Text("–").foregroundColor(.secondary)
                 }
@@ -229,7 +233,7 @@ struct OverpayText: View {
     var body: some View {
         if let value {
             Text(Fmt.pct(value, signed: true)).monospacedDigit()
-                .foregroundColor(value > 0 ? .orange : (value < 0 ? .green : .primary))
+                .foregroundColor(value > 0 ? .warn : (value < 0 ? .gain : .primary))
         } else {
             Text("–").foregroundColor(.secondary)
         }
@@ -248,13 +252,11 @@ struct ActivityHints: View {
                     Label {
                         Text("\(s.name) war in den letzten 24 h besonders aktiv: \(s.count24h) Transfers, \(Fmt.eur(s.spent24h)) ausgegeben.")
                     } icon: {
-                        Image(systemName: "flame.fill").foregroundColor(.orange)
+                        Image(systemName: "flame.fill").foregroundColor(.warn)
                     }
                 }
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .bannerSurface(.warn)
         }
     }
 }
@@ -271,7 +273,7 @@ struct ManagerTransferPanel: View {
                 Text("(\(periodLabel))").foregroundColor(.secondary)
                 if stats.isHot {
                     Label("In den letzten 24 h besonders aktiv", systemImage: "flame.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(.warn)
                         .font(.callout)
                 }
             }
@@ -280,12 +282,12 @@ struct ManagerTransferPanel: View {
                 StatCard(title: "Ausgegeben", value: Fmt.eur(stats.spent))
                 StatCard(title: "Eingenommen", value: Fmt.eur(stats.earned))
                 StatCard(title: "Saldo", value: Fmt.signedEur(stats.balance),
-                         color: stats.balance > 0 ? .green : (stats.balance < 0 ? .red : nil))
+                         color: stats.balance > 0 ? .gain : (stats.balance < 0 ? .loss : nil))
                 StatCard(title: "Ø Überzahlung ggü. akt. MW",
                          value: stats.avgOverpay.map { Fmt.pct($0, signed: true) } ?? "–",
-                         color: (stats.avgOverpay ?? 0) > 0 ? .orange : nil)
+                         color: (stats.avgOverpay ?? 0) > 0 ? .warn : nil)
                 StatCard(title: "Transfers 24 h", value: "\(stats.count24h)",
-                         color: stats.isHot ? .orange : nil)
+                         color: stats.isHot ? .warn : nil)
             }
             InsightBox(
                 title: "Zuletzt gekauft",

@@ -87,24 +87,30 @@ enum Fmt {
     }
 }
 
+/// KPI tile: label with icon, big rounded number.
 struct StatCard: View {
     let title: String
     let value: String
     var color: Color? = nil
+    var icon: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                if let icon {
+                    Image(systemName: icon).font(.caption).foregroundColor(.secondary)
+                }
+                Text(title).font(.caption).foregroundColor(.secondary).lineLimit(1)
+            }
             Text(value)
-                .font(.title3.weight(.semibold))
-                .monospacedDigit()
+                .font(Theme.number(20))
                 .foregroundColor(color ?? .primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .cardSurface(padding: 12)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -114,7 +120,7 @@ struct TrendText: View {
     var body: some View {
         Text(Fmt.signedEur(value))
             .monospacedDigit()
-            .foregroundColor(value > 0 ? .green : (value < 0 ? .red : .secondary))
+            .foregroundColor(Theme.signColor(value))
     }
 }
 
@@ -125,14 +131,12 @@ struct PlayerNameCell: View {
         HStack(spacing: 6) {
             Text(player.fullName)
             if !player.isFit {
-                Text(player.statusText)
-                    .font(.caption2)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color.red.opacity(0.2), in: RoundedRectangle(cornerRadius: 4))
+                Badge(text: player.statusShort, color: .loss, help: player.statusText)
             }
             if player.onMarket {
-                Image(systemName: "tag.fill").foregroundColor(.orange).help("Auf dem Transfermarkt")
+                Image(systemName: "tag.fill").foregroundColor(.warn)
+                    .help("Auf dem Transfermarkt")
+                    .accessibilityLabel("Auf dem Transfermarkt")
             }
         }
     }
@@ -149,19 +153,25 @@ struct PlayerTable: View {
     var body: some View {
         Table(players.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.lastName) { p in PlayerNameCell(player: p) }
-            TableColumn("Pos.", value: \.position) { p in Text(p.positionName) }
-                .width(50)
-            TableColumn("Verein", value: \.teamId) { p in Text(state.teamName(p.teamId)) }
+                .width(min: 140, ideal: 200)
+            TableColumn("Pos.", value: \.position) { p in PositionChip(position: p.position) }
+                .width(44)
+            TableColumn("Verein", value: \.teamId) { p in ClubCell(name: state.teamName(p.teamId)) }
+                .width(min: 90, ideal: 120)
             TableColumn("Marktwert", value: \.marketValue) { p in
                 Text(Fmt.eur(p.marketValue)).monospacedDigit()
             }
-            TableColumn("24h", value: \.trend24h) { p in TrendText(value: p.trend24h) }
+            .width(min: 90, ideal: 110)
+            TableColumn("24 h", value: \.trend24h) { p in TrendText(value: p.trend24h) }
+                .width(min: 80, ideal: 95)
             TableColumn("Punkte", value: \.totalPoints) { p in
                 Text(Fmt.int(p.totalPoints)).monospacedDigit()
             }
-            TableColumn("Ø Punkte", value: \.averagePoints) { p in
+            .width(min: 45, ideal: 60)
+            TableColumn("Ø", value: \.averagePoints) { p in
                 Text(Fmt.int(p.averagePoints)).monospacedDigit()
             }
+            .width(min: 35, ideal: 50)
         }
         .contextMenu(forSelectionType: Player.ID.self) { ids in
             if let p = player(for: ids) {
@@ -183,8 +193,8 @@ struct InsightBox: View {
     let lines: [String]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption.weight(.semibold)).foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.subheadline.weight(.semibold))
             if lines.isEmpty {
                 Text("–").foregroundColor(.secondary)
             } else {
@@ -194,7 +204,21 @@ struct InsightBox: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .padding(10)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .cardSurface(padding: 12)
+    }
+}
+
+/// Remaining time; under 6 h with a clock icon (not only color).
+struct ExpiryText: View {
+    let date: Date?
+    let soon: Bool
+
+    var body: some View {
+        HStack(spacing: 3) {
+            if soon { Image(systemName: "clock.badge.exclamationmark") }
+            Text(Fmt.remaining(date)).monospacedDigit()
+        }
+        .foregroundColor(soon ? .warn : .primary)
+        .accessibilityLabel(soon ? "Läuft bald ab: \(Fmt.remaining(date))" : Fmt.remaining(date))
     }
 }

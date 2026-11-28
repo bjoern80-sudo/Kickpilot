@@ -21,7 +21,8 @@ struct KickbaseMacApp: App {
         WindowGroup("Kickpilot") {
             ContentView()
                 .environmentObject(state)
-                .frame(minWidth: 1100, minHeight: 680)
+                .frame(minWidth: 1180, minHeight: 720)
+                .tint(.brand)
         }
         .commands {
             CommandGroup(replacing: .newItem) {}

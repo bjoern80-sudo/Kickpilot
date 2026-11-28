@@ -10,6 +10,8 @@ APP="Kickpilot.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp ".build/release/KickbaseMac" "$APP/Contents/MacOS/Kickpilot"
+cp "branding/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+cp "custom_components/kickbase/brand/icon@2x.png" "$APP/Contents/Resources/Emblem.png"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -20,6 +22,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIdentifier</key><string>local.kickbase-mac</string>   <!-- bleibt gleich: Einstellungen + Schlüsselbund -->
     <key>CFBundleName</key><string>Kickpilot</string>
     <key>CFBundleDisplayName</key><string>Kickpilot</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>CFBundleVersion</key><string>1</string>

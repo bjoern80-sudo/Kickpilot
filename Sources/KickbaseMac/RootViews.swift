@@ -23,10 +23,12 @@ struct LoginView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "soccerball")
-                .font(.system(size: 48))
-                .foregroundColor(.accentColor)
-            Text("Kickpilot").font(.largeTitle.bold())
+            Emblem(size: 96)
+            VStack(spacing: 4) {
+                Wordmark(size: 34)
+                Text("Dein Kickbase-Begleiter für den Mac")
+                    .foregroundColor(.secondary)
+            }
 
             Form {
                 TextField("E-Mail", text: $email)
@@ -38,7 +40,7 @@ struct LoginView: View {
 
             if let error = state.errorMessage {
                 Text(error)
-                    .foregroundColor(.red)
+                    .foregroundColor(.loss)
                     .multilineTextAlignment(.center)
                     .frame(width: 380)
             }
@@ -55,12 +57,16 @@ struct LoginView: View {
             .keyboardShortcut(.defaultAction)
             .disabled(email.isEmpty || password.isEmpty || state.isLoading)
 
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+
             Text("„Mit Apple anmelden“ funktioniert hier nicht – nutze dein Kickbase-Passwort.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.pageBackground)
         .onAppear { if email.isEmpty { email = state.savedEmail } }
     }
 }
@@ -94,8 +100,9 @@ struct MainView: View {
 
     private func badge(for item: SidebarItem) -> Text? {
         switch item {
-        case .auto where state.deadlineAlert: return Text("!")
-        case .team where !(state.lineupCheck?.problems.isEmpty ?? true): return Text("!")
+        case .auto where state.deadlineAlert: return Text("Frist")
+        case .team where !(state.lineupCheck?.problems.isEmpty ?? true):
+            return Text("\(state.lineupCheck?.problems.count ?? 0)")
         default: return nil
         }
     }
@@ -107,22 +114,46 @@ struct MainView: View {
                     .badge(badge(for: item))
                     .tag(item)
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .safeAreaInset(edge: .bottom) {
-                VStack(alignment: .leading, spacing: 6) {
-                    if !state.userName.isEmpty {
-                        Label(state.userName, systemImage: "person.crop.circle")
-                            .font(.callout)
+            .navigationSplitViewColumnWidth(min: 190, ideal: 210)
+            .safeAreaInset(edge: .top) {
+                HStack(spacing: 8) {
+                    Emblem(size: 34)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Wordmark(size: 17)
+                        if let league = state.currentLeague?.name {
+                            Text(league).font(.caption).foregroundColor(.secondary).lineLimit(1)
+                        }
                     }
-                    if let date = state.lastUpdate {
-                        Text("Stand: \(date.formatted(date: .omitted, time: .shortened)) Uhr")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Button("Abmelden") { state.logout() }
-                        .buttonStyle(.link)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+            }
+            .safeAreaInset(edge: .bottom) {
+                HStack(spacing: 8) {
+                    Text(String(state.userName.prefix(1)).uppercased())
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Color.brandNavy))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(state.userName.isEmpty ? "Angemeldet" : state.userName)
+                            .font(.callout.weight(.medium)).lineLimit(1)
+                        if let date = state.lastUpdate {
+                            Text("Stand \(date.formatted(date: .omitted, time: .shortened)) Uhr")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+                    Spacer(minLength: 4)
+                    Button {
+                        state.logout()
+                    } label: {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Abmelden")
+                    .accessibilityLabel("Abmelden")
+                }
                 .padding(12)
             }
         } detail: {
@@ -144,7 +175,7 @@ struct MainView: View {
                 AnalysisView(selectedManagerId: $analysisManagerId)
             }
         }
-        .navigationTitle(state.currentLeague?.name ?? "Kickpilot")
+        .navigationTitle("")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if state.leagues.count > 1 {
@@ -155,9 +186,11 @@ struct MainView: View {
                     }
                     .frame(width: 200)
                 }
-                Text("Budget: \(Fmt.eur(state.budget))")
-                    .monospacedDigit()
-                    .foregroundColor(state.budget < 0 ? .red : .primary)
+                Label(Fmt.eur(state.budget), systemImage: "eurosign.circle")
+                    .labelStyle(.titleAndIcon)
+                    .font(.callout.weight(.semibold).monospacedDigit())
+                    .foregroundColor(state.budget < 0 ? .loss : .primary)
+                    .help("Budget")
                 if state.isLoading {
                     ProgressView().controlSize(.small)
                 }
@@ -181,5 +214,16 @@ struct MainView: View {
         } message: {
             Text(state.errorMessage ?? "")
         }
+    }
+}
+
+/// "Kickpilot" wordmark: "Kick" in the text color, "pilot" in brand gold (as in the logo).
+struct Wordmark: View {
+    var size: CGFloat = 17
+
+    var body: some View {
+        (Text("Kick").foregroundColor(.primary) + Text("pilot").foregroundColor(.brandText))
+            .font(.system(size: size, weight: .heavy, design: .rounded))
+            .accessibilityLabel("Kickpilot")
     }
 }

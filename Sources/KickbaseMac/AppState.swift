@@ -297,8 +297,9 @@ final class AppState: ObservableObject {
             }
         }
 
-        // League switched meanwhile: discard the result.
-        guard currentLeague?.id == league.id else {
+        // View closed meanwhile (task cancelled) or league switched: discard the result
+        // silently – the next visit loads again.
+        guard !Task.isCancelled, currentLeague?.id == league.id else {
             transfersLoading = false
             return
         }

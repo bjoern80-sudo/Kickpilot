@@ -12,24 +12,41 @@ struct TeamView: View {
     private var trend: Double { state.squad.reduce(0.0) { $0 + $1.trend24h } }
     private var points: Double { state.squad.reduce(0.0) { $0 + $1.totalPoints } }
 
+    private var subtitle: String {
+        var parts = [state.currentLeague?.name ?? "Kickbase"]
+        if let check = state.lineupCheck, let day = check.matchday {
+            parts.append(check.lockAt.map { "\(day). Spieltag – Aufstellung bis \(Fmt.deadline($0))" }
+                         ?? "\(day). Spieltag läuft")
+        }
+        return parts.joined(separator: " · ")
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
+        Page(title: "Mein Team", subtitle: subtitle) {
+            HStack(spacing: Theme.gap) {
                 StatCard(title: "Budget", value: Fmt.eur(state.budget),
-                         color: state.budget < 0 ? .red : nil)
-                StatCard(title: "Teamwert", value: Fmt.eur(teamValue))
-                StatCard(title: "Marktwert 24h", value: Fmt.signedEur(trend),
-                         color: trend > 0 ? .green : (trend < 0 ? .red : nil))
-                StatCard(title: "Punkte (Kader)", value: Fmt.int(points))
-                StatCard(title: "Spieler", value: "\(state.squad.count)")
+                         color: state.budget < 0 ? .loss : nil, icon: "eurosign.circle")
+                StatCard(title: "Teamwert", value: Fmt.eur(teamValue), icon: "chart.line.uptrend.xyaxis")
+                StatCard(title: "Marktwert 24 h", value: Fmt.signedEur(trend),
+                         color: trend == 0 ? nil : Theme.signColor(trend), icon: "clock.arrow.circlepath")
+                StatCard(title: "Punkte (Kader)", value: Fmt.int(points), icon: "star")
             }
             ForEach(state.injuryAlerts) { a in
                 InjuryBanner(alert: a, onSell: { sellAlert = a }, onDismiss: { state.dismissInjury(a) })
             }
-            if let check = state.lineupCheck { LineupBanner(check: check) }
-            PlayerTable(players: state.squad, sortOrder: $sortOrder) { detailPlayer = $0 }
+            if let check = state.lineupCheck, !check.issues.isEmpty { LineupBanner(check: check) }
+            HStack(alignment: .top, spacing: Theme.gap) {
+                ScrollView {
+                    PitchCard(squad: state.squad, check: state.lineupCheck) { detailPlayer = $0 }
+                }
+                .frame(width: 340)
+                Card(title: "Kader", detail: "\(state.squad.count) / \(AutoRules.maxSquadSize) Spieler", padding: 0) {
+                    PlayerTable(players: state.squad, sortOrder: $sortOrder) { detailPlayer = $0 }
+                        .scrollContentBackground(.hidden)
+                        .fittedTableHeight(rows: state.squad.count, max: 560)
+                }
+            }
         }
-        .padding()
         .sheet(item: $detailPlayer) { p in
             PlayerDetailView(player: p).environmentObject(state)
         }
@@ -65,17 +82,17 @@ struct InjuryBanner: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "cross.case.fill").foregroundColor(.red)
+            Image(systemName: "cross.case.fill").foregroundColor(.loss)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(alert.player.fullName) (\(alert.player.positionName)) ist als verletzt gemeldet")
                     .font(.callout.weight(.semibold))
                 Text("Verletzte Spieler verlieren meist an Wert. Bis \(day) 22:00 Uhr bringt ein Verkauf an Kickbase noch ca. \(Fmt.eur(alert.proceeds)).")
                     .font(.caption).foregroundColor(.secondary)
                 if alert.inCore {
-                    Text("Gehört zu deinen Top 11 (Ø-Punkte).").font(.caption).foregroundColor(.orange)
+                    Text("Gehört zu deinen Top 11 (Ø-Punkte).").font(.caption).foregroundColor(.warn)
                 }
                 if !alert.sellable {
-                    Text("Verkauf nicht möglich: \(alert.reason).").font(.caption).foregroundColor(.red)
+                    Text("Verkauf nicht möglich: \(alert.reason).").font(.caption).foregroundColor(.loss)
                 }
             }
             Spacer()
@@ -84,8 +101,7 @@ struct InjuryBanner: View {
             }
             Button("Behalten", action: onDismiss)
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.08)))
+        .bannerSurface(.loss)
     }
 }
 
@@ -100,9 +116,9 @@ struct LineupBanner: View {
                     Label("Spieltag \(check.matchday ?? 0) läuft – Aufstellung gesperrt", systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                 } else if check.problems.isEmpty {
-                    Label("Aufstellung ok", systemImage: "checkmark.circle.fill").foregroundColor(.green)
+                    Label("Aufstellung ok", systemImage: "checkmark.circle.fill").foregroundColor(.gain)
                 } else {
-                    Label("Aufstellung prüfen", systemImage: "exclamationmark.triangle.fill").foregroundColor(.red)
+                    Label("Aufstellung prüfen", systemImage: "exclamationmark.triangle.fill").foregroundColor(.loss)
                 }
                 if let lock = check.lockAt {
                     Text("· Spieltag \(check.matchday ?? 0), muss stehen bis \(Fmt.deadline(lock))")
@@ -116,7 +132,7 @@ struct LineupBanner: View {
             ForEach(check.issues) { i in
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: i.isProblem ? "exclamationmark.circle.fill" : "arrow.left.arrow.right")
-                        .foregroundColor(i.isProblem ? .red : .orange)
+                        .foregroundColor(i.isProblem ? .loss : .warn)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(i.isProblem ? i.text : "Tipp: \(i.text)")
                         Text(detail(i)).font(.caption).foregroundColor(.secondary)
@@ -128,11 +144,7 @@ struct LineupBanner: View {
                     .font(.caption).foregroundColor(.secondary)
             }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(
-            (check.problems.isEmpty ? Color.green : Color.red).opacity(check.lockAt == nil ? 0.04 : 0.08)
-        ))
+        .bannerSurface(check.problems.isEmpty ? .brandText : .loss)
     }
 
     private func detail(_ i: LineupIssue) -> String {
@@ -155,12 +167,10 @@ struct LeagueView: View {
     @State private var selection: Manager.ID? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Doppelklick auf einen Manager öffnet die Kader-Analyse.")
-                .font(.caption)
-                .foregroundColor(.secondary)
+        Page(title: "Liga", subtitle: "\(state.managers.count) Manager · Doppelklick öffnet die Kader-Analyse") {
+            Card(title: "Tabelle", padding: 0) {
             Table(state.managers, selection: $selection) {
-                TableColumn("Platz") { m in Text("\(m.placement)").monospacedDigit() }
+                TableColumn("Platz") { m in PlacementBadge(placement: m.placement) }
                     .width(50)
                 TableColumn("Manager") { m in
                     Text(m.id == state.myUserId ? "\(m.name) (du)" : m.name)
@@ -181,8 +191,34 @@ struct LeagueView: View {
             } primaryAction: { ids in
                 if let id = ids.first { onSelectManager(id) }
             }
+            .scrollContentBackground(.hidden)
+            .fittedTableHeight(rows: state.managers.count)
+            }
+            Spacer(minLength: 0)
         }
-        .padding()
+    }
+}
+
+/// League placement; top three in gold, silver, bronze.
+struct PlacementBadge: View {
+    let placement: Int
+
+    private var medal: Color? {
+        switch placement {
+        case 1: return Color(hex: 0xD4A017)
+        case 2: return Color(hex: 0x9AA4B2)
+        case 3: return Color(hex: 0xB0703C)
+        default: return nil
+        }
+    }
+
+    var body: some View {
+        Text("\(placement)")
+            .font(Theme.number(12, weight: .bold))
+            .foregroundColor(medal == nil ? .secondary : .white)
+            .frame(width: 22, height: 22)
+            .background(Circle().fill(medal ?? Color.clear))
+            .accessibilityLabel("Platz \(placement)")
     }
 }
 
@@ -196,10 +232,20 @@ struct PlayerDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(player.fullName).font(.title2.bold())
-                    Text("\(player.positionName) · \(state.teamName(player.teamId)) · \(player.statusText)")
-                        .foregroundColor(.secondary)
+                HStack(spacing: 12) {
+                    ClubCrest(club: .named(state.teamName(player.teamId)), size: 40)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(player.fullName).font(.title2.bold())
+                        HStack(spacing: 6) {
+                            PositionChip(position: player.position)
+                            Text(state.teamName(player.teamId)).foregroundColor(.secondary)
+                            if player.isFit {
+                                Badge(text: "fit", color: .gain)
+                            } else {
+                                Badge(text: player.statusText, color: .loss)
+                            }
+                        }
+                    }
                 }
                 Spacer()
                 Button("Schließen") { dismiss() }
@@ -209,7 +255,7 @@ struct PlayerDetailView: View {
             HStack(spacing: 10) {
                 StatCard(title: "Marktwert", value: Fmt.eur(player.marketValue))
                 StatCard(title: "24h", value: Fmt.signedEur(player.trend24h),
-                         color: player.trend24h > 0 ? .green : (player.trend24h < 0 ? .red : nil))
+                         color: player.trend24h > 0 ? .gain : (player.trend24h < 0 ? .loss : nil))
                 StatCard(title: "Punkte", value: Fmt.int(player.totalPoints))
                 StatCard(title: "Ø Punkte", value: Fmt.int(player.averagePoints))
             }
@@ -227,6 +273,14 @@ struct PlayerDetailView: View {
                             y: .value("Mio. €", point.value / 1_000_000)
                         )
                         .interpolationMethod(.monotone)
+                        .foregroundStyle(Color.brand)
+                        AreaMark(
+                            x: .value("Datum", point.date),
+                            y: .value("Mio. €", point.value / 1_000_000)
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(LinearGradient(colors: [Color.brand.opacity(0.25), Color.brand.opacity(0)],
+                                                        startPoint: .top, endPoint: .bottom))
                     }
                     .chartYAxisLabel("Mio. €")
                 }

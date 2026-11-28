@@ -22,7 +22,8 @@ struct MarketView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        Page(title: "Transfermarkt",
+             subtitle: "\(filtered.count) Spieler · Doppelklick öffnet das Gebot") {
             HStack(spacing: 16) {
                 Picker("Position", selection: $positionFilter) {
                     Text("Alle").tag(0)
@@ -35,15 +36,23 @@ struct MarketView: View {
                 .frame(width: 320)
                 Toggle("Nur Kickbase-Angebote", isOn: $onlyKickbase)
                 Spacer()
-                Text("\(filtered.count) Spieler · Doppelklick = Gebot")
-                    .foregroundColor(.secondary)
+                Button {
+                    if let p = player(for: selection.map { [$0] } ?? []) { bidPlayer = p }
+                } label: {
+                    Label("Bieten …", systemImage: "hand.raised")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selection == nil)
+                .help("Gebot für den ausgewählten Spieler abgeben")
             }
 
+            Card(title: "Angebote", padding: 0) {
             Table(filtered, selection: $selection, sortOrder: $sortOrder) {
                 TableColumn("Name", value: \.lastName) { p in PlayerNameCell(player: p) }
-                TableColumn("Pos.", value: \.position) { p in Text(p.positionName) }
-                    .width(45)
-                TableColumn("Verein", value: \.teamId) { p in Text(state.teamName(p.teamId)) }
+                    .width(min: 180, ideal: 220)
+                TableColumn("Pos.", value: \.position) { p in PositionChip(position: p.position) }
+                    .width(44)
+                TableColumn("Verein", value: \.teamId) { p in ClubCell(name: state.teamName(p.teamId)) }
                 TableColumn("Preis", value: \.effectivePrice) { p in
                     Text(Fmt.eur(p.effectivePrice)).monospacedDigit()
                 }
@@ -58,8 +67,7 @@ struct MarketView: View {
                     Text(Fmt.dec(p.pointsPerMillion)).monospacedDigit()
                 }
                 TableColumn("Läuft ab", value: \.expiresIn) { p in
-                    Text(Fmt.remaining(p.expiresAt))
-                        .foregroundColor(p.expiresIn < 6 * 3600 ? .orange : .primary)
+                    ExpiryText(date: p.expiresAt, soon: p.expiresIn < 6 * 3600)
                 }
                 TableColumn("Anbieter", value: \.sellerSortKey) { p in Text(state.sellerName(p)) }
             }
@@ -71,11 +79,12 @@ struct MarketView: View {
             } primaryAction: { ids in
                 if let p = player(for: ids) { bidPlayer = p }
             }
+            .scrollContentBackground(.hidden)
             .sheet(item: $detailPlayer) { p in
                 PlayerDetailView(player: p).environmentObject(state)
             }
+            }
         }
-        .padding()
         .searchable(text: $search, prompt: "Spieler oder Verein")
         .sheet(item: $bidPlayer) { p in
             BidView(player: p).environmentObject(state)
@@ -106,7 +115,16 @@ struct BidView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Gebot für \(player.fullName)").font(.title2.bold())
+            HStack(spacing: 10) {
+                ClubCrest(club: .named(state.teamName(player.teamId)), size: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Gebot für \(player.fullName)").font(.title2.bold())
+                    HStack(spacing: 6) {
+                        PositionChip(position: player.position)
+                        Text(state.teamName(player.teamId)).foregroundColor(.secondary)
+                    }
+                }
+            }
 
             Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 6) {
                 GridRow {
@@ -159,11 +177,11 @@ struct BidView: View {
             .controlSize(.small)
 
             Text("Budget danach: \(Fmt.eur(budgetAfter))")
-                .foregroundColor(budgetAfter < 0 ? .red : .secondary)
+                .foregroundColor(budgetAfter < 0 ? .loss : .secondary)
             if amount < player.effectivePrice {
                 Text("Achtung: Gebot liegt unter dem Angebotspreis.")
                     .font(.caption)
-                    .foregroundColor(.orange)
+                    .foregroundColor(.warn)
             }
 
             if !myOffers.isEmpty {
@@ -184,7 +202,7 @@ struct BidView: View {
             }
 
             if let errorText {
-                Text(errorText).foregroundColor(.red).font(.callout)
+                Text(errorText).foregroundColor(.loss).font(.callout)
             }
 
             HStack {

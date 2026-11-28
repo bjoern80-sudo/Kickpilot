@@ -135,6 +135,14 @@ enum TrendPattern: String, Hashable {
     /// Fell to a bottom and is rising again since.
     case reversal = "Trendumkehr"
     case none = "kein Muster"
+
+    var short: String {
+        switch self {
+        case .steadyRise: return "Anstieg"
+        case .reversal: return "Umkehr"
+        case .none: return "–"
+        }
+    }
 }
 
 /// Market value trend of a player: current rise, previous peak and expected sale value.

@@ -113,6 +113,20 @@ struct Player: Identifiable, Hashable, Sendable {
 
     var isFit: Bool { status == 0 }
 
+    /// Short status for badges (full text in `statusText`).
+    var statusShort: String {
+        switch status {
+        case 2: return "angeschl."
+        case 4: return "Aufbau"
+        case 8: return "Rot"
+        case 16: return "Gelb-Rot"
+        case 32: return "Gelb"
+        case 64: return "n. Kader"
+        case 128: return "n. Liga"
+        default: return statusText
+        }
+    }
+
     var statusText: String {
         switch status {
         case 0: return "fit"
